@@ -1,0 +1,24 @@
+-- ============================================================================
+-- CARA MEMBUAT ADMIN
+-- ============================================================================
+--
+-- Ikuti 3 langkah berikut DI URUTAN ini:
+--
+-- LANGKAH 1: Buat user di Supabase Auth (Dashboard -> Authentication -> Users
+--            -> Add User). Catat email yang digunakan, misalnya:
+--            admin@bpjs-magang.test
+--            password: <buat password kuat>
+--
+-- LANGKAH 2: Jalankan query berikut di SQL Editor untuk memasukkan email tsb
+--            ke tabel admin_roles (ROLE DIPERLUKAN AGAR RLS MENGIZINKAN AKSES):
+--
+INSERT INTO public.admin_roles (email, role) VALUES ('admin@bpjs-magang.test', 'superadmin');
+
+-- LANGKAH 3: Login di portal admin (/login) dengan email & password tersebut.
+--            Setelah login, Anda bisa mengelola semua data (peserta, absensi,
+--            laporan, BPU, PU, dsb).
+--
+-- NOTE: Hanya email yang terdaftar di tabel admin_roles yang dianggap admin.
+--       User auth yang tidak ada di admin_roles TIDAK bisa membaca data
+--       sensitif (NIK BPU/PU, log, dsb) karena diblokir oleh RLS.
+-- ============================================================================

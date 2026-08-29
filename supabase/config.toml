@@ -1,0 +1,4 @@
+project_id = "tzhepmapjnezuwcodepo"
+
+[functions.upload-attendance]
+verify_jwt = false
