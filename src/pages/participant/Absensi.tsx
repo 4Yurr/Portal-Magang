@@ -6,8 +6,9 @@ import { LocationPicker } from '../../components/participant/LocationPicker';
 import { ParticipantSearch } from '../../components/ui/ParticipantSearch';
 import { Spinner } from '../../components/ui/Spinner';
 import type { GeoLocation } from '../../types';
+import { fetchAttendanceSettings } from '../../services/adminService';
 import { getServerWib, submitAttendance, uploadAttendancePhoto } from '../../services/participantService';
-import { evalSessionWindow, wibDateString, wibTimeString, isValidPhoto, formatBytes } from '../../utils/constants';
+import { evalSessionWindowByConfig, wibDateString, wibTimeString, isValidPhoto, formatBytes } from '../../utils/constants';
 
 export default function Absensi() {
   const navigate = useNavigate();
@@ -17,6 +18,10 @@ export default function Absensi() {
   const [serverWibDate, setServerWibDate] = useState<Date | null>(null);
   const [lokasiKegiatan, setLokasiKegiatan] = useState('');
   const [location, setLocation] = useState<GeoLocation | null>(null);
+  const [attendanceSettings, setAttendanceSettings] = useState<Record<'PAGI' | 'SORE', { start: string; end: string; isActive: boolean }>>({
+    PAGI: { start: '08:00:00', end: '09:30:00', isActive: true },
+    SORE: { start: '15:30:00', end: '17:00:00', isActive: true },
+  });
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -31,6 +36,23 @@ export default function Absensi() {
   const refreshServerTime = useCallback(async () => {
     const { date } = await getServerWib();
     setServerWibDate(date);
+
+    const settings = await fetchAttendanceSettings();
+    const mapped = {
+      PAGI: { start: '08:00:00', end: '09:30:00', isActive: true },
+      SORE: { start: '15:30:00', end: '17:00:00', isActive: true },
+    } as Record<'PAGI' | 'SORE', { start: string; end: string; isActive: boolean }>;
+
+    settings.forEach((cfg) => {
+      const session = cfg.session as 'PAGI' | 'SORE';
+      mapped[session] = {
+        start: cfg.start_time,
+        end: cfg.end_time,
+        isActive: cfg.is_active,
+      };
+    });
+
+    setAttendanceSettings(mapped);
   }, []);
 
   useEffect(() => {
@@ -40,9 +62,9 @@ export default function Absensi() {
   }, [refreshServerTime]);
 
   const now = serverWibDate ?? new Date();
-  const pagi = evalSessionWindow(now, 'PAGI');
-  const sore = evalSessionWindow(now, 'SORE');
-  const activeSession = pagi.isOpen ? 'PAGI' : sore.isOpen ? 'SORE' : null;
+  const pagi = evalSessionWindowByConfig(now, attendanceSettings.PAGI.start, attendanceSettings.PAGI.end);
+  const sore = evalSessionWindowByConfig(now, attendanceSettings.SORE.start, attendanceSettings.SORE.end);
+  const activeSession = pagi.isOpen && attendanceSettings.PAGI.isActive ? 'PAGI' : sore.isOpen && attendanceSettings.SORE.isActive ? 'SORE' : null;
 
   const handlePhoto = (file: File | null) => {
     setPhoto(file);
@@ -121,18 +143,18 @@ export default function Absensi() {
         <div className="info-banner">
           <span>⏰</span>
           <div>
-            <strong>Jadwal Absensi:</strong> Sesi Pagi (08:00 – 09:30 WIB) & Sesi Sore (15:30 – 17:00 WIB)
+            <strong>Jadwal Absensi:</strong> Sesi Pagi ({attendanceSettings.PAGI.start.slice(0, 5)} – {attendanceSettings.PAGI.end.slice(0, 5)} WIB) & Sesi Sore ({attendanceSettings.SORE.start.slice(0, 5)} – {attendanceSettings.SORE.end.slice(0, 5)} WIB)
             <br />
             <em>Waktu server: {wibDateString(now)} {wibTimeString(now)} WIB</em>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-          <span className={`badge ${pagi.isOpen ? 'badge-success' : 'badge-neutral'}`}>
-            {pagi.isOpen ? 'Absensi Pagi Dibuka' : 'Absensi Pagi Ditutup'}
+          <span className={`badge ${pagi.isOpen && attendanceSettings.PAGI.isActive ? 'badge-success' : 'badge-neutral'}`}>
+            {pagi.isOpen && attendanceSettings.PAGI.isActive ? 'Absensi Pagi Dibuka' : 'Absensi Pagi Ditutup'}
           </span>
-          <span className={`badge ${sore.isOpen ? 'badge-success' : 'badge-neutral'}`}>
-            {sore.isOpen ? 'Absensi Sore Dibuka' : 'Absensi Sore Ditutup'}
+          <span className={`badge ${sore.isOpen && attendanceSettings.SORE.isActive ? 'badge-success' : 'badge-neutral'}`}>
+            {sore.isOpen && attendanceSettings.SORE.isActive ? 'Absensi Sore Dibuka' : 'Absensi Sore Ditutup'}
           </span>
         </div>
 

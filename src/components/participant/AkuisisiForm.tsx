@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
-import { uploadFile, submitAkuisisi } from '../../services/participantService';
+import { uploadFile, submitAkuisisi, uploadAkuisisiFileToDrive } from '../../services/participantService';
 import { isValidNIK, MAX_REPORT_SIZE } from '../../utils/constants';
 
 const KELOMPOK = Array.from({ length: 10 }, (_, i) => String(i + 1));
@@ -76,13 +76,29 @@ export function AkuisisiForm({ type }: Props) {
         },
       });
 
-      showToast(res.message, res.success ? 'success' : 'error');
-      if (res.success) {
+      if (res.success && res.id) {
+        const driveUp = await uploadAkuisisiFileToDrive({
+          id: res.id,
+          kelompok,
+          jenis: type.toLowerCase() as 'bpu' | 'pu',
+          filename: file.name,
+          file,
+        });
+
+        if (!driveUp.ok) {
+          console.error('Google Drive upload failed:', driveUp.error);
+          showToast('Data disimpan, tapi gagal mengunggah ke Google Drive.', 'info');
+        } else {
+          showToast('Data dan file Google Drive berhasil disimpan.', 'success');
+        }
+
         setKelompok('');
         setNamaKtp('');
         setNik('');
         setJenisKelamin('');
         handleFile(null);
+      } else {
+        showToast(res.message || 'Gagal menyimpan data.', 'error');
       }
     } catch (e) {
       console.error(`${type} submit error:`, e);

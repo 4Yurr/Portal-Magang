@@ -7,7 +7,8 @@ function getFolderIdForJenis(jenis: string): string {
   const map: Record<string, string | undefined> = {
     biasa: Deno.env.get('GDRIVE_FOLDER_ID_ABSENSI'),
     seminar: Deno.env.get('GDRIVE_FOLDER_ID_SEMINAR'),
-    // jenis lain (default) → folder utama
+    bpu: Deno.env.get('GDRIVE_FOLDER_ID_BPU') || '1z9wb119pfxlUMkd_5HEisTeXt9XPIO42',
+    pu: Deno.env.get('GDRIVE_FOLDER_ID_PU') || '1GNZTZ4FKoiln3n62vhlZrmGf_AcCCAs8',
   }
   const folder = map[jenis]
   return folder || Deno.env.get('GDRIVE_FOLDER_ID') || '1jAAVWzLXH15OIct6ZUqxlpKJzs1VYokl'
@@ -71,7 +72,6 @@ async function getAccessToken(): Promise<string> {
 }
 
 async function uploadToDrive(folderId: string, accessToken: string, filename: string, contentType: string, data: Uint8Array): Promise<string> {
-  // Upload media (drive tidak mendeteksi tipe, menerima apapun) lalu set parent folder.
   const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=media&fields=id,name', {
     method: 'POST',
     headers: {
@@ -88,7 +88,6 @@ async function uploadToDrive(folderId: string, accessToken: string, filename: st
   const out = await res.json()
   const fileId: string = out.id
 
-  // Pindahkan ke folder tujuan menggunakan addParents parameter
   const patchRes = await fetch(
     `https://www.googleapis.com/drive/v3/files/${fileId}?addParents=${encodeURIComponent(folderId)}&fields=id,name,parents`,
     {
@@ -114,7 +113,6 @@ const CORS_HEADERS = {
 }
 
 serve(async (req) => {
-  // Tangani preflight CORS (method OPTIONS) yang dikirim browser utk request non-simple
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
@@ -134,12 +132,17 @@ serve(async (req) => {
     const originalFilename = url.searchParams.get('filename') || 'photo.jpg'
     const jenis = url.searchParams.get('jenis') || 'biasa'
     const kegiatan = url.searchParams.get('kegiatan') || ''
+    const id = url.searchParams.get('id') || ''
+    const kelompok = url.searchParams.get('kelompok') || ''
 
-    if (!participantId || !tanggal) {
+    if ((jenis === 'biasa' || jenis === 'seminar') && (!participantId || !tanggal)) {
       return json({ ok: false, error: 'Missing nim/tanggal' }, CORS_HEADERS, 400)
     }
     if (jenis === 'seminar' && !kegiatan) {
       return json({ ok: false, error: 'Missing kegiatan for seminar' }, CORS_HEADERS, 400)
+    }
+    if ((jenis === 'bpu' || jenis === 'pu') && !id) {
+      return json({ ok: false, error: 'Missing record id for BPU/PU' }, CORS_HEADERS, 400)
     }
 
     const blob = await req.blob()
@@ -147,15 +150,21 @@ serve(async (req) => {
       return json({ ok: false, error: 'Empty file' }, CORS_HEADERS, 400)
     }
 
-    // --- Upload ke Google Drive (folder sesuai jenis) ---
     const folderId = getFolderIdForJenis(jenis)
     const accessToken = await getAccessToken()
     const typeFromQuery = url.searchParams.get('type') || ''
     const ext = originalFilename.includes('.') ? originalFilename.split('.').pop()!.toLowerCase() : ''
     const contentType = resolveContentType(typeFromQuery, ext)
-    const safeExt = contentType.includes('png') ? '.png' : '.jpg'
-    const tag = jenis === 'seminar' ? `seminar_${kegiatan}` : session
-    const driveFilename = `${participantId}_${tanggal}_${tag}${safeExt}`
+    const safeExt = contentType.includes('png') ? '.png' : contentType.includes('pdf') ? '.pdf' : '.jpg'
+
+    let driveFilename = ''
+    if (jenis === 'bpu' || jenis === 'pu') {
+      driveFilename = `${jenis.toUpperCase()}_Kelompok_${kelompok}_${id}${safeExt}`
+    } else {
+      const tag = jenis === 'seminar' ? `seminar_${kegiatan}` : session
+      driveFilename = `${participantId}_${tanggal}_${tag}${safeExt}`
+    }
+
     const driveFileId = await uploadToDrive(
       folderId,
       accessToken,
@@ -164,7 +173,6 @@ serve(async (req) => {
       new Uint8Array(await blob.arrayBuffer()),
     )
 
-    // --- Simpan metadata ke tabel yg sesuai (via service role server-side) ---
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
     const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const adminClient = createClient(supabaseUrl, serviceRole)
@@ -183,6 +191,15 @@ serve(async (req) => {
         .eq('participant_id', participantId)
         .eq('tanggal', tanggal)
         .eq('kegiatan', kegiatan)
+    } else if (jenis === 'bpu' || jenis === 'pu') {
+      const dbTable = jenis === 'bpu' ? 'akuisisi_bpu' : 'akuisisi_pu'
+      query = adminClient
+        .from(dbTable)
+        .update({
+          drive_file_id: driveFileId,
+          drive_url: photoUrl,
+        })
+        .eq('id', id)
     } else {
       query = adminClient
         .from('attendance')

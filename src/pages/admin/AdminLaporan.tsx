@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
 import { FileModal, DownloadButton } from '../../components/admin/FileActions';
-import { fetchReports } from '../../services/adminService';
+import { fetchReports, deleteReport } from '../../services/adminService';
 import type { ReportRow } from '../../types';
 import { formatDateTime, formatBytes } from '../../utils/constants';
 import { exportToExcel } from '../../utils/excel';
@@ -14,6 +14,7 @@ export default function AdminLaporan() {
   const [search, setSearch] = useState('');
   const [tanggal, setTanggal] = useState('');
   const [fileView, setFileView] = useState<ReportRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ReportRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -24,6 +25,18 @@ export default function AdminLaporan() {
     setData(res);
     setLoading(false);
   }, [search, tanggal]);
+
+  const removeRow = async () => {
+    if (!deleteTarget) return;
+    const { error } = await deleteReport(deleteTarget.id);
+    if (error) {
+      showToast('Gagal menghapus laporan', 'error');
+      return;
+    }
+    showToast('Laporan berhasil dihapus', 'success');
+    setDeleteTarget(null);
+    load();
+  };
 
   useEffect(() => {
     load();
@@ -112,6 +125,13 @@ export default function AdminLaporan() {
                         Lihat PDF
                       </button>
                       <DownloadButton storagePath={d.storage_path} filename={d.filename} label="Download" />
+                      <button
+                        className="btn btn-danger"
+                        style={{ padding: '5px 9px', fontSize: '0.78rem' }}
+                        onClick={() => setDeleteTarget(d)}
+                      >
+                        Hapus
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -135,6 +155,23 @@ export default function AdminLaporan() {
           mimeType={fileView.mime_type}
           onClose={() => setFileView(null)}
         />
+      )}
+
+      {deleteTarget && (
+        <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Konfirmasi Hapus</h3>
+            <p>
+              Apakah Anda yakin ingin menghapus laporan <strong>{deleteTarget.judul}</strong> oleh <strong>{deleteTarget.nama}</strong>?
+              <br />
+              <span style={{ color: 'var(--danger)', fontWeight: 'bold' }}>Data yang dihapus tidak dapat dikembalikan.</span>
+            </p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button className="btn btn-danger" onClick={removeRow}>Hapus Permanen</button>
+              <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>Batal</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -22,6 +22,7 @@ import AdminBPU from './pages/admin/AdminBPU';
 import AdminPU from './pages/admin/AdminPU';
 import AdminMateri from './pages/admin/AdminMateri';
 import ExportData from './pages/admin/ExportData';
+import Pengaturan from './pages/admin/Pengaturan';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { isAuthenticated, loading } = useAuth();
@@ -74,7 +75,7 @@ export default function App() {
           <Route path="pu" element={<AdminPU />} />
           <Route path="materi" element={<AdminMateri />} />
           <Route path="export" element={<ExportData />} />
-          <Route path="pengaturan" element={<Dashboard />} />
+          <Route path="pengaturan" element={<Pengaturan />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,8 @@
 // Domain-level types used across the app.
 
 export type Session = 'PAGI' | 'SORE';
+export type AttendanceStatus = 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
+export type AttendanceStatusOption = 'Hadir' | 'Izin' | 'Sakit';
 
 export type Participant = {
   nim: string;
@@ -21,7 +23,7 @@ export type AttendanceRow = {
   tanggal: string;
   jam: string;
   session: 'PAGI' | 'SORE';
-  status: 'Hadir' | 'Ditolak';
+  status: AttendanceStatus;
   latitude: number | null;
   longitude: number | null;
   accuracy: number | null;
@@ -40,7 +42,7 @@ export type SeminarRow = {
   kegiatan: string;
   tanggal: string;
   jam: string;
-  status: 'Hadir' | 'Ditolak';
+  status: AttendanceStatus;
   latitude: number | null;
   longitude: number | null;
   accuracy: number | null;
@@ -84,6 +86,9 @@ export type AkuisisiRow = {
   mime_type: string;
   size_bytes: number;
   created_at: string;
+  updated_at: string;
+  drive_file_id: string | null;
+  drive_url: string | null;
 };
 
 export type MaterialRow = {

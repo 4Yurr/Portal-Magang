@@ -42,20 +42,21 @@ export interface Database {
           tanggal: string;
           session: 'PAGI' | 'SORE';
           jam: string;
-          status: 'Hadir' | 'Ditolak';
+          status: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           latitude: number | null;
           longitude: number | null;
           accuracy: number | null;
           photo_path: string | null;
           photo_filename: string | null;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           participant_id: string;
           tanggal: string;
           session: 'PAGI' | 'SORE';
           jam: string;
-          status?: 'Hadir' | 'Ditolak';
+          status?: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           latitude?: number | null;
           longitude?: number | null;
           accuracy?: number | null;
@@ -64,7 +65,9 @@ export interface Database {
         };
         Update: {
           session?: 'PAGI' | 'SORE';
-          status?: 'Hadir' | 'Ditolak';
+          tanggal?: string;
+          jam?: string;
+          status?: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           photo_path?: string | null;
           photo_filename?: string | null;
         };
@@ -77,7 +80,7 @@ export interface Database {
           kegiatan: string;
           tanggal: string;
           jam: string;
-          status: 'Hadir' | 'Ditolak';
+          status: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           latitude: number | null;
           longitude: number | null;
           accuracy: number | null;
@@ -90,7 +93,7 @@ export interface Database {
           kegiatan: string;
           tanggal: string;
           jam: string;
-          status?: 'Hadir' | 'Ditolak';
+          status?: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           latitude?: number | null;
           longitude?: number | null;
           accuracy?: number | null;
@@ -98,7 +101,7 @@ export interface Database {
           photo_filename?: string | null;
         };
         Update: {
-          status?: 'Hadir' | 'Ditolak';
+          status?: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
         };
         Relationships: [];
       };
@@ -156,6 +159,9 @@ export interface Database {
           mime_type: string;
           size_bytes: number;
           created_at: string;
+          updated_at: string;
+          drive_file_id: string | null;
+          drive_url: string | null;
         };
         Insert: {
           kelompok: string;
@@ -166,8 +172,17 @@ export interface Database {
           filename: string;
           mime_type: string;
           size_bytes?: number;
+          drive_file_id?: string | null;
+          drive_url?: string | null;
         };
-        Update: Record<string, never>;
+        Update: {
+          kelompok?: string;
+          nama_ktp?: string;
+          nik?: string;
+          jenis_kelamin?: 'Laki-laki' | 'Perempuan';
+          drive_file_id?: string | null;
+          drive_url?: string | null;
+        };
         Relationships: [];
       };
       akuisisi_pu: {
@@ -182,6 +197,9 @@ export interface Database {
           mime_type: string;
           size_bytes: number;
           created_at: string;
+          updated_at: string;
+          drive_file_id: string | null;
+          drive_url: string | null;
         };
         Insert: {
           kelompok: string;
@@ -192,8 +210,17 @@ export interface Database {
           filename: string;
           mime_type: string;
           size_bytes?: number;
+          drive_file_id?: string | null;
+          drive_url?: string | null;
         };
-        Update: Record<string, never>;
+        Update: {
+          kelompok?: string;
+          nama_ktp?: string;
+          nik?: string;
+          jenis_kelamin?: 'Laki-laki' | 'Perempuan';
+          drive_file_id?: string | null;
+          drive_url?: string | null;
+        };
       };
       materials: {
         Row: {
@@ -237,13 +264,14 @@ export interface Database {
           tanggal: string;
           jam: string;
           session: 'PAGI' | 'SORE';
-          status: 'Hadir' | 'Ditolak';
+          status: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           latitude: number | null;
           longitude: number | null;
           accuracy: number | null;
           photo_path: string | null;
           photo_filename: string | null;
           created_at: string;
+          updated_at: string;
         };
       };
       v_seminar: {
@@ -257,13 +285,14 @@ export interface Database {
           kegiatan: string;
           tanggal: string;
           jam: string;
-          status: 'Hadir' | 'Ditolak';
+          status: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           latitude: number | null;
           longitude: number | null;
           accuracy: number | null;
           photo_path: string | null;
           photo_filename: string | null;
           created_at: string;
+          updated_at: string;
         };
       };
       v_reports: {

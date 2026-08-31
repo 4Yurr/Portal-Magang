@@ -82,11 +82,68 @@ export async function uploadAttendancePhoto(opts: {
   }
 }
 
+export async function uploadAkuisisiFileToDrive(opts: {
+  id: string;
+  kelompok: string;
+  jenis: 'bpu' | 'pu';
+  filename: string;
+  file: File;
+}): Promise<{ ok: boolean; error: string }> {
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const qs = new URLSearchParams({
+      id: opts.id,
+      kelompok: opts.kelompok,
+      jenis: opts.jenis,
+      filename: opts.filename,
+    });
+    if (opts.file.type) qs.set('type', opts.file.type);
+    const res = await fetch(
+      `${supabaseUrl}/functions/v1/upload-attendance?${qs.toString()}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': opts.file.type || 'application/octet-stream',
+          Authorization: `Bearer ${anonKey}`,
+        },
+        body: opts.file,
+      },
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      return { ok: false, error: data.error || `HTTP ${res.status}` };
+    }
+    return { ok: true, error: '' };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export async function getServerWib(): Promise<{ date: Date }> {
   const { data } = await supabase.rpc('now_wib');
   const local = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
   if (!data) return { date: local };
-  return { date: new Date(data) };
+
+  // now_wib() returns a Jakarta-local timestamp. Some PostgREST responses add a
+  // timezone suffix, which makes Date parse it as UTC and shifts the clock +7h.
+  const raw = String(data).replace(/([+-]\d{2}:\d{2}|Z)$/i, '');
+  const match = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/,
+  );
+  if (!match) return { date: local };
+
+  const [, year, month, day, hour, minute, second] = match;
+  return {
+    date: new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second),
+    ),
+  };
 }
 
 // ---- Upload to Supabase Storage (returns storage path) ----
@@ -258,8 +315,8 @@ export async function submitAkuisisi(
     jenis_kelamin: 'Laki-laki' | 'Perempuan';
     file: StoredFile;
   },
-): Promise<{ success: boolean; message: string }> {
-  const { error } = await supabase.from(table).insert({
+): Promise<{ success: boolean; message: string; id?: string }> {
+  const { data, error } = await supabase.from(table).insert({
     kelompok: payload.kelompok,
     nama_ktp: payload.nama_ktp,
     nik: payload.nik,
@@ -268,12 +325,12 @@ export async function submitAkuisisi(
     filename: payload.file.filename,
     mime_type: payload.file.mimeType,
     size_bytes: payload.file.size,
-  });
+  }).select('id').single();
   if (error) {
     console.error(`submitAkuisisi (${table}) error:`, error);
-    return { success: false, message: 'Gagal menyimpan data. Silakan coba lagi.' };
+    return { success: false, message: `Gagal menyimpan data: ${error.message}` };
   }
-  return { success: true, message: 'Data berhasil disimpan.' };
+  return { success: true, message: 'Data berhasil disimpan.', id: data?.id };
 }
 
 // ============================================================================

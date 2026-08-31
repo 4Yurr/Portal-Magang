@@ -241,12 +241,230 @@ export async function fetchMaterials(): Promise<MaterialRow[]> {
   return (data ?? []) as MaterialRow[];
 }
 
+export type AttendanceSetting = {
+  id: string;
+  session: 'PAGI' | 'SORE';
+  start_time: string;
+  end_time: string;
+  active_date_start: string | null;
+  active_date_end: string | null;
+  is_active: boolean;
+  updated_at: string;
+};
+
+export async function fetchAttendanceSettings(): Promise<AttendanceSetting[]> {
+  const { data, error } = await supabase
+    .from('attendance_settings')
+    .select('*')
+    .order('session', { ascending: true });
+  if (error) {
+    console.error('fetchAttendanceSettings error:', error);
+    return [];
+  }
+  return (data ?? []) as AttendanceSetting[];
+}
+
+export async function upsertAttendanceSetting(payload: {
+  session: 'PAGI' | 'SORE';
+  start_time: string;
+  end_time: string;
+  active_date_start: string | null;
+  active_date_end: string | null;
+  is_active: boolean;
+}) {
+  return supabase.from('attendance_settings').upsert(
+    {
+      session: payload.session,
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+      active_date_start: payload.active_date_start,
+      active_date_end: payload.active_date_end,
+      is_active: payload.is_active,
+    },
+    { onConflict: 'session' },
+  );
+}
+
+export async function fetchAuditLogs(limit = 20): Promise<any[]> {
+  const { data, error } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (error) {
+    console.error('fetchAuditLogs error:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+async function writeAuditLog(tableName: string, recordId: string, action: 'CREATE' | 'UPDATE' | 'DELETE', beforeValue: any, afterValue: any) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const actor_email = session?.user?.email || 'unknown_admin';
+    await supabase.from('audit_logs').insert({
+      actor_email,
+      table_name: tableName,
+      record_id: recordId,
+      action,
+      before_value: beforeValue,
+      after_value: afterValue
+    });
+  } catch (e) {
+    console.error('Failed to write audit log:', e);
+  }
+}
+
+export async function updateAttendanceStatus(id: string, status: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak') {
+  const { data: beforeData } = await supabase.from('attendance').select('*').eq('id', id).single();
+  const res = await supabase.from('attendance').update({ status }).eq('id', id).select().single();
+  if (!res.error && beforeData) {
+    await writeAuditLog('attendance', id, 'UPDATE', beforeData, res.data);
+  }
+  return res;
+}
+
+export async function updateAttendance(id: string, updates: { tanggal?: string; jam?: string; status?: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak'; session?: 'PAGI' | 'SORE' }) {
+  const { data: beforeData } = await supabase.from('attendance').select('*').eq('id', id).single();
+  const res = await supabase.from('attendance').update(updates).eq('id', id).select().single();
+  if (!res.error && beforeData) {
+    await writeAuditLog('attendance', id, 'UPDATE', beforeData, res.data);
+  }
+  return res;
+}
+
+export async function deleteAttendance(id: string) {
+  const { data: beforeData } = await supabase.from('attendance').select('*').eq('id', id).single();
+  if (beforeData) {
+    await writeAuditLog('attendance', id, 'DELETE', beforeData, null);
+  }
+  return supabase.from('attendance').delete().eq('id', id);
+}
+
+export async function updateSeminarStatus(id: string, status: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak') {
+  const { data: beforeData } = await supabase.from('seminar_attendance').select('*').eq('id', id).single();
+  const res = await supabase.from('seminar_attendance').update({ status }).eq('id', id).select().single();
+  if (!res.error && beforeData) {
+    await writeAuditLog('seminar_attendance', id, 'UPDATE', beforeData, res.data);
+  }
+  return res;
+}
+
+export async function updateSeminar(id: string, updates: { kegiatan?: string; tanggal?: string; jam?: string; status?: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak' }) {
+  const { data: beforeData } = await supabase.from('seminar_attendance').select('*').eq('id', id).single();
+  const res = await supabase.from('seminar_attendance').update(updates).eq('id', id).select().single();
+  if (!res.error && beforeData) {
+    await writeAuditLog('seminar_attendance', id, 'UPDATE', beforeData, res.data);
+  }
+  return res;
+}
+
+export async function deleteSeminar(id: string) {
+  const { data: beforeData } = await supabase.from('seminar_attendance').select('*').eq('id', id).single();
+  if (beforeData) {
+    await writeAuditLog('seminar_attendance', id, 'DELETE', beforeData, null);
+  }
+  return supabase.from('seminar_attendance').delete().eq('id', id);
+}
+
+export async function deleteAkuisisi(table: 'akuisisi_bpu' | 'akuisisi_pu', id: string) {
+  const { data: beforeData } = await supabase.from(table).select('*').eq('id', id).single();
+  if (beforeData) {
+    await writeAuditLog(table, id, 'DELETE', beforeData, null);
+    if (beforeData.storage_path) {
+      const idx = beforeData.storage_path.indexOf('/');
+      const bucket = beforeData.storage_path.slice(0, idx);
+      const path = beforeData.storage_path.slice(idx + 1);
+      await supabase.storage.from(bucket).remove([path]);
+    }
+  }
+  return supabase.from(table).delete().eq('id', id);
+}
+
+export async function updateAkuisisi(
+  table: 'akuisisi_bpu' | 'akuisisi_pu',
+  id: string,
+  updates: { kelompok: string; nama_ktp: string; nik: string; jenis_kelamin: 'Laki-laki' | 'Perempuan' }
+) {
+  const { data: beforeData } = await supabase.from(table).select('*').eq('id', id).single();
+  const res = await supabase.from(table).update(updates).eq('id', id).select().single();
+  if (!res.error && beforeData) {
+    await writeAuditLog(table, id, 'UPDATE', beforeData, res.data);
+  }
+  return res;
+}
+
+export async function deleteReport(id: string) {
+  const { data: beforeData } = await supabase.from('reports').select('*').eq('id', id).single();
+  if (beforeData) {
+    await writeAuditLog('reports', id, 'DELETE', beforeData, null);
+    if (beforeData.storage_path) {
+      const idx = beforeData.storage_path.indexOf('/');
+      const bucket = beforeData.storage_path.slice(0, idx);
+      const path = beforeData.storage_path.slice(idx + 1);
+      await supabase.storage.from(bucket).remove([path]);
+    }
+  }
+  return supabase.from('reports').delete().eq('id', id);
+}
+
+export async function deleteTikTok(id: string) {
+  const { data: beforeData } = await supabase.from('tiktok_submissions').select('*').eq('id', id).single();
+  if (beforeData) {
+    await writeAuditLog('tiktok_submissions', id, 'DELETE', beforeData, null);
+  }
+  return supabase.from('tiktok_submissions').delete().eq('id', id);
+}
+
+export async function updateTikTok(id: string, updates: { kelompok?: string; pengirim?: string; url?: string; note?: string }) {
+  const { data: beforeData } = await supabase.from('tiktok_submissions').select('*').eq('id', id).single();
+  const res = await supabase.from('tiktok_submissions').update(updates).eq('id', id).select().single();
+  if (!res.error && beforeData) {
+    await writeAuditLog('tiktok_submissions', id, 'UPDATE', beforeData, res.data);
+  }
+  return res;
+}
+
+export async function deleteMaterial(id: string) {
+  const { data: beforeData } = await supabase.from('materials').select('*').eq('id', id).single();
+  if (beforeData) {
+    await writeAuditLog('materials', id, 'DELETE', beforeData, null);
+    if (beforeData.storage_path) {
+      const idx = beforeData.storage_path.indexOf('/');
+      const bucket = beforeData.storage_path.slice(0, idx);
+      const path = beforeData.storage_path.slice(idx + 1);
+      await supabase.storage.from(bucket).remove([path]);
+    }
+  }
+  return supabase.from('materials').delete().eq('id', id);
+}
+
+export async function updateMaterial(id: string, updates: { title?: string; description?: string; is_active?: boolean; storage_path?: string; filename?: string }) {
+  const { data: beforeData } = await supabase.from('materials').select('*').eq('id', id).single();
+  const res = await supabase.from('materials').update(updates).eq('id', id).select().single();
+  if (!res.error && beforeData) {
+    await writeAuditLog('materials', id, 'UPDATE', beforeData, res.data);
+  }
+  return res;
+}
+
+export async function insertMaterial(payload: { slug: string; title: string; description: string; storage_path: string; filename: string }) {
+  const res = await supabase.from('materials').insert(payload).select().single();
+  if (!res.error && res.data) {
+    await writeAuditLog('materials', res.data.id, 'CREATE', null, res.data);
+  }
+  return res;
+}
+
 // ============================================================================
 // FILE DOWNLOAD (signed URL untuk file privat)
 // ============================================================================
 export async function getSignedDownloadUrl(storagePath: string, filename: string): Promise<string | null> {
   if (!storagePath) return null;
+  if (/^https?:\/\//i.test(storagePath)) {
+    return storagePath;
+  }
   const idx = storagePath.indexOf('/');
+  if (idx <= 0) {
+    console.error('Invalid storage path:', storagePath);
+    return null;
+  }
   const bucket = storagePath.slice(0, idx);
   const path = storagePath.slice(idx + 1);
   const { data, error } = await supabase.storage

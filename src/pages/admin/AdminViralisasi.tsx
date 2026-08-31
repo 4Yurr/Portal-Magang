@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
-import { fetchTikTok } from '../../services/adminService';
+import { fetchTikTok, deleteTikTok } from '../../services/adminService';
 import type { TikTokRow } from '../../types';
 import { formatDateTime } from '../../utils/constants';
 import { exportToExcel } from '../../utils/excel';
@@ -12,6 +12,7 @@ export default function AdminViralisasi() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [kelompok, setKelompok] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<TikTokRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -22,6 +23,18 @@ export default function AdminViralisasi() {
     setData(res);
     setLoading(false);
   }, [search, kelompok]);
+
+  const removeRow = async () => {
+    if (!deleteTarget) return;
+    const { error } = await deleteTikTok(deleteTarget.id);
+    if (error) {
+      showToast('Gagal menghapus link TikTok', 'error');
+      return;
+    }
+    showToast('Link TikTok berhasil dihapus', 'success');
+    setDeleteTarget(null);
+    load();
+  };
 
   useEffect(() => {
     load();
@@ -87,6 +100,7 @@ export default function AdminViralisasi() {
                   <th>URL TikTok</th>
                   <th>Tanggal</th>
                   <th>Status</th>
+                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -101,11 +115,20 @@ export default function AdminViralisasi() {
                     </td>
                     <td>{formatDateTime(d.created_at)}</td>
                     <td><span className="badge badge-success">Berhasil</span></td>
+                    <td>
+                      <button
+                        className="btn btn-danger"
+                        style={{ padding: '5px 9px', fontSize: '0.78rem' }}
+                        onClick={() => setDeleteTarget(d)}
+                      >
+                        Hapus
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {data.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: 30 }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: 30 }}>
                       Tidak ada data viralisasi.
                     </td>
                   </tr>
@@ -115,6 +138,23 @@ export default function AdminViralisasi() {
           )}
         </div>
       </div>
+
+      {deleteTarget && (
+        <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Konfirmasi Hapus</h3>
+            <p>
+              Apakah Anda yakin ingin menghapus link TikTok dari <strong>{deleteTarget.pengirim}</strong>?
+              <br />
+              <span style={{ color: 'var(--danger)', fontWeight: 'bold' }}>Data yang dihapus tidak dapat dikembalikan.</span>
+            </p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button className="btn btn-danger" onClick={removeRow}>Hapus Permanen</button>
+              <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

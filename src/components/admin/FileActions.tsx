@@ -45,8 +45,7 @@ export function PhotoViewModal({ storagePath, filename, onClose }: {
         setLoading(false);
         return;
       }
-      const u = await getSignedDownloadUrl(storagePath, filename ?? 'foto');
-      setUrl(u);
+      setUrl(await getSignedDownloadUrl(storagePath, filename ?? 'foto'));
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

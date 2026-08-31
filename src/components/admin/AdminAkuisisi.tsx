@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../ui/Toast';
 import { Spinner } from '../ui/Spinner';
 import { FileModal, DownloadButton } from './FileActions';
-import { fetchAkuisisi } from '../../services/adminService';
+import { fetchAkuisisi, deleteAkuisisi, updateAkuisisi } from '../../services/adminService';
 import type { AkuisisiRow } from '../../types';
 import { formatDateTime, formatBytes, maskNik } from '../../utils/constants';
 import { exportToExcel } from '../../utils/excel';
@@ -23,6 +23,13 @@ export function AdminAkuisisi({ type, title, table }: Props) {
   const [kelompok, setKelompok] = useState('');
   const [fileView, setFileView] = useState<AkuisisiRow | null>(null);
   const [showNik, setShowNik] = useState(false);
+  const [editingRow, setEditingRow] = useState<AkuisisiRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AkuisisiRow | null>(null);
+
+  const [kelompokDraft, setKelompokDraft] = useState('');
+  const [namaKtpDraft, setNamaKtpDraft] = useState('');
+  const [nikDraft, setNikDraft] = useState('');
+  const [jenisKelaminDraft, setJenisKelaminDraft] = useState<'Laki-laki' | 'Perempuan'>('Laki-laki');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +44,41 @@ export function AdminAkuisisi({ type, title, table }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleUpdate = async (row: AkuisisiRow) => {
+    if (!kelompokDraft) return showToast('Pilih kelompok', 'error');
+    if (!namaKtpDraft.trim()) return showToast('Nama wajib diisi', 'error');
+    if (!/^\d{16}$/.test(nikDraft.trim())) return showToast('NIK harus 16 digit angka', 'error');
+
+    const { error } = await updateAkuisisi(table, row.id, {
+      kelompok: kelompokDraft,
+      nama_ktp: namaKtpDraft.trim(),
+      nik: nikDraft.trim(),
+      jenis_kelamin: jenisKelaminDraft,
+    });
+
+    if (error) {
+      showToast('Gagal memperbarui data ' + type, 'error');
+      return;
+    }
+
+    showToast('Data ' + type + ' berhasil diperbarui', 'success');
+    setEditingRow(null);
+    load();
+  };
+
+  const removeRow = async () => {
+    if (!deleteTarget) return;
+    const { error } = await deleteAkuisisi(table, deleteTarget.id);
+    if (error) {
+      showToast('Gagal menghapus data ' + type, 'error');
+      return;
+    }
+
+    showToast('Data ' + type + ' berhasil dihapus', 'success');
+    setDeleteTarget(null);
+    load();
+  };
 
   const handleExport = () => {
     exportToExcel(
@@ -120,7 +162,7 @@ export function AdminAkuisisi({ type, title, table }: Props) {
                     <td>{d.filename}</td>
                     <td>{formatBytes(d.size_bytes)}</td>
                     <td>{formatDateTime(d.created_at)}</td>
-                    <td style={{ display: 'flex', gap: 6 }}>
+                    <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {d.mime_type.startsWith('image/') || d.filename.toLowerCase().endsWith('.pdf') ? (
                         <button
                           className="btn btn-outline"
@@ -131,6 +173,26 @@ export function AdminAkuisisi({ type, title, table }: Props) {
                         </button>
                       ) : null}
                       <DownloadButton storagePath={d.storage_path} filename={d.filename} label="Download" />
+                      <button
+                        className="btn btn-outline"
+                        style={{ padding: '5px 9px', fontSize: '0.78rem' }}
+                        onClick={() => {
+                          setEditingRow(d);
+                          setKelompokDraft(d.kelompok);
+                          setNamaKtpDraft(d.nama_ktp);
+                          setNikDraft(d.nik);
+                          setJenisKelaminDraft(d.jenis_kelamin);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        style={{ padding: '5px 9px', fontSize: '0.78rem' }}
+                        onClick={() => setDeleteTarget(d)}
+                      >
+                        Hapus
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -154,6 +216,61 @@ export function AdminAkuisisi({ type, title, table }: Props) {
           mimeType={fileView.mime_type}
           onClose={() => setFileView(null)}
         />
+      )}
+
+      {editingRow && (
+        <div className="modal-overlay" onClick={() => setEditingRow(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Ubah Data {type}</h3>
+            <label>Kelompok</label>
+            <select value={kelompokDraft} onChange={(e) => setKelompokDraft(e.target.value)}>
+              {Array.from({ length: 10 }, (_, i) => (
+                <option key={i} value={String(i + 1)}>
+                  Kelompok {i + 1}
+                </option>
+              ))}
+            </select>
+
+            <label>Nama Lengkap (sesuai KTP)</label>
+            <input type="text" value={namaKtpDraft} onChange={(e) => setNamaKtpDraft(e.target.value)} />
+
+            <label>NIK</label>
+            <input
+              type="text"
+              value={nikDraft}
+              maxLength={16}
+              onChange={(e) => setNikDraft(e.target.value.replace(/\D/g, ''))}
+            />
+
+            <label>Jenis Kelamin</label>
+            <select value={jenisKelaminDraft} onChange={(e) => setJenisKelaminDraft(e.target.value as 'Laki-laki' | 'Perempuan')}>
+              <option value="Laki-laki">Laki-laki</option>
+              <option value="Perempuan">Perempuan</option>
+            </select>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button className="btn btn-primary" onClick={() => handleUpdate(editingRow)}>Simpan</button>
+              <button className="btn btn-outline" onClick={() => setEditingRow(null)}>Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Konfirmasi Hapus</h3>
+            <p>
+              Apakah Anda yakin ingin menghapus data {type} <strong>{deleteTarget.nama_ktp}</strong>?
+              <br />
+              <span style={{ color: 'var(--danger)', fontWeight: 'bold' }}>Data yang dihapus tidak dapat dikembalikan.</span>
+            </p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button className="btn btn-danger" onClick={removeRow}>Hapus Permanen</button>
+              <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>Batal</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

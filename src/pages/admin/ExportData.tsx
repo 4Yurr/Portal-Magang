@@ -11,8 +11,8 @@ import {
   fetchAkuisisi,
   fetchParticipants,
 } from '../../services/adminService';
-import { maskNik } from '../../utils/constants';
-import { exportToExcel } from '../../utils/excel';
+import { maskNik, formatDate } from '../../utils/constants';
+import { exportToExcel, exportWorkbook } from '../../utils/excel';
 
 export default function ExportData() {
   const { showToast } = useToast();
@@ -203,6 +203,240 @@ export default function ExportData() {
       );
     });
 
+  const handleWorkbook = () =>
+    run('workbook', async () => {
+      const [attendance, seminar, participants, tiktok, reports, bpu, pu] = await Promise.all([
+        fetchAttendance(),
+        fetchSeminar(),
+        fetchParticipants({ pageSize: 100000 }),
+        fetchTikTok(),
+        fetchReports(),
+        fetchAkuisisi('akuisisi_bpu'),
+        fetchAkuisisi('akuisisi_pu'),
+      ]);
+
+      // 1. Pivot Absensi Biasa
+      const biasasKeySet = new Set<string>();
+      attendance.forEach((att) => {
+        if (att.tanggal && att.session) {
+          biasasKeySet.add(`${att.tanggal} / ${att.session}`);
+        }
+      });
+      const biasasKeys = Array.from(biasasKeySet).sort();
+
+      const rekapBiasaColumns = [
+        { header: 'NIM', key: 'nim', width: 18 },
+        { header: 'Nama', key: 'nama', width: 28 },
+        { header: 'Kelompok', key: 'kelompok', width: 12 },
+        ...biasasKeys.map((key) => ({ header: key, key: key, width: 16 })),
+      ];
+
+      const biasaMap: Record<string, Record<string, string>> = {};
+      attendance.forEach((att) => {
+        if (att.nim && att.tanggal && att.session) {
+          if (!biasaMap[att.nim]) biasaMap[att.nim] = {};
+          const statusShort = att.status === 'Hadir' ? 'H' : att.status === 'Izin' ? 'I' : att.status === 'Sakit' ? 'S' : 'D';
+          biasaMap[att.nim][`${att.tanggal} / ${att.session}`] = statusShort;
+        }
+      });
+
+      const rekapBiasaRows = participants.data.map((p) => {
+        const row: Record<string, any> = {
+          nim: p.nim,
+          nama: p.nama,
+          kelompok: p.kelompok,
+        };
+        biasasKeys.forEach((key) => {
+          row[key] = biasaMap[p.nim]?.[key] || '-';
+        });
+        return row;
+      });
+
+      // 2. Pivot Absensi Seminar
+      const seminarKeySet = new Set<string>();
+      seminar.forEach((sem) => {
+        if (sem.kegiatan && sem.tanggal) {
+          seminarKeySet.add(`${sem.kegiatan} (${formatDate(sem.tanggal)})`);
+        }
+      });
+      const seminarKeys = Array.from(seminarKeySet).sort();
+
+      const rekapSeminarColumns = [
+        { header: 'NIM', key: 'nim', width: 18 },
+        { header: 'Nama', key: 'nama', width: 28 },
+        { header: 'Kelompok', key: 'kelompok', width: 12 },
+        ...seminarKeys.map((key) => ({ header: key, key: key, width: 22 })),
+      ];
+
+      const seminarMap: Record<string, Record<string, string>> = {};
+      seminar.forEach((sem) => {
+        if (sem.nim && sem.kegiatan && sem.tanggal) {
+          if (!seminarMap[sem.nim]) seminarMap[sem.nim] = {};
+          const statusShort = sem.status === 'Hadir' ? 'H' : sem.status === 'Izin' ? 'I' : sem.status === 'Sakit' ? 'S' : 'D';
+          seminarMap[sem.nim][`${sem.kegiatan} (${formatDate(sem.tanggal)})`] = statusShort;
+        }
+      });
+
+      const rekapSeminarRows = participants.data.map((p) => {
+        const row: Record<string, any> = {
+          nim: p.nim,
+          nama: p.nama,
+          kelompok: p.kelompok,
+        };
+        seminarKeys.forEach((key) => {
+          row[key] = seminarMap[p.nim]?.[key] || '-';
+        });
+        return row;
+      });
+
+      return exportWorkbook(
+        [
+          {
+            name: 'Rekap Absensi Biasa',
+            columns: rekapBiasaColumns,
+            rows: rekapBiasaRows,
+          },
+          {
+            name: 'Log Absensi Biasa',
+            columns: [
+              { header: 'NIM', key: 'nim' },
+              { header: 'Nama', key: 'nama' },
+              { header: 'Tanggal', key: 'tanggal' },
+              { header: 'Jam', key: 'jam' },
+              { header: 'Sesi', key: 'session' },
+              { header: 'Status', key: 'status' },
+              { header: 'Latitude', key: 'latitude' },
+              { header: 'Longitude', key: 'longitude' },
+              { header: 'Akurasi', key: 'accuracy' },
+              { header: 'Created At', key: 'created_at' },
+            ],
+            rows: attendance.map((d) => ({
+              nim: d.nim ?? '',
+              nama: d.nama ?? '',
+              tanggal: d.tanggal,
+              jam: d.jam,
+              session: d.session,
+              status: d.status,
+              latitude: d.latitude ?? '',
+              longitude: d.longitude ?? '',
+              accuracy: d.accuracy ?? '',
+              created_at: d.created_at,
+            })),
+          },
+          {
+            name: 'Rekap Absensi Seminar',
+            columns: rekapSeminarColumns,
+            rows: rekapSeminarRows,
+          },
+          {
+            name: 'Log Absensi Seminar',
+            columns: [
+              { header: 'NIM', key: 'nim' },
+              { header: 'Nama', key: 'nama' },
+              { header: 'Kegiatan', key: 'kegiatan' },
+              { header: 'Tanggal', key: 'tanggal' },
+              { header: 'Jam', key: 'jam' },
+              { header: 'Status', key: 'status' },
+              { header: 'Created At', key: 'created_at' },
+            ],
+            rows: seminar.map((d) => ({
+              nim: d.nim ?? '',
+              nama: d.nama ?? '',
+              kegiatan: d.kegiatan,
+              tanggal: d.tanggal,
+              jam: d.jam,
+              status: d.status,
+              created_at: d.created_at,
+            })),
+          },
+          {
+            name: 'Peserta',
+            columns: [
+              { header: 'NIM', key: 'nim' },
+              { header: 'Nama', key: 'nama' },
+              { header: 'Fakultas', key: 'fakultas' },
+              { header: 'Prodi', key: 'prodi' },
+              { header: 'Kelompok', key: 'kelompok' },
+            ],
+            rows: participants.data.map((d) => ({
+              nim: d.nim,
+              nama: d.nama,
+              fakultas: d.fakultas,
+              prodi: d.prodi,
+              kelompok: d.kelompok,
+            })),
+          },
+          {
+            name: 'Video Viralisasi',
+            columns: [
+              { header: 'Kelompok', key: 'kelompok' },
+              { header: 'Pengirim', key: 'pengirim' },
+              { header: 'URL', key: 'url' },
+              { header: 'Created At', key: 'created_at' },
+            ],
+            rows: tiktok.map((d) => ({
+              kelompok: d.kelompok,
+              pengirim: d.pengirim,
+              url: d.url,
+              created_at: d.created_at,
+            })),
+          },
+          {
+            name: 'Laporan',
+            columns: [
+              { header: 'NIM', key: 'nim' },
+              { header: 'Nama', key: 'nama' },
+              { header: 'Judul', key: 'judul' },
+              { header: 'File', key: 'filename' },
+              { header: 'Created At', key: 'created_at' },
+            ],
+            rows: reports.map((d) => ({
+              nim: d.nim ?? '',
+              nama: d.nama ?? '',
+              judul: d.judul,
+              filename: d.filename,
+              created_at: d.created_at,
+            })),
+          },
+          {
+            name: 'Data BPU',
+            columns: [
+              { header: 'Kelompok', key: 'kelompok' },
+              { header: 'Nama', key: 'nama_ktp' },
+              { header: 'NIK', key: 'nik' },
+              { header: 'Jenis Kelamin', key: 'jenis_kelamin' },
+              { header: 'Created At', key: 'created_at' },
+            ],
+            rows: bpu.map((d) => ({
+              kelompok: d.kelompok,
+              nama_ktp: d.nama_ktp,
+              nik: maskNik(d.nik),
+              jenis_kelamin: d.jenis_kelamin,
+              created_at: d.created_at,
+            })),
+          },
+          {
+            name: 'Data PU',
+            columns: [
+              { header: 'Kelompok', key: 'kelompok' },
+              { header: 'Nama', key: 'nama_ktp' },
+              { header: 'NIK', key: 'nik' },
+              { header: 'Jenis Kelamin', key: 'jenis_kelamin' },
+              { header: 'Created At', key: 'created_at' },
+            ],
+            rows: pu.map((d) => ({
+              kelompok: d.kelompok,
+              nama_ktp: d.nama_ktp,
+              nik: maskNik(d.nik),
+              jenis_kelamin: d.jenis_kelamin,
+              created_at: d.created_at,
+            })),
+          },
+        ],
+        'Portal_Magang_Export.xlsx',
+      );
+    });
+
   type ExportItem = {
     key: string;
     label: string;
@@ -212,6 +446,7 @@ export default function ExportData() {
   };
 
   const items: ExportItem[] = [
+    { key: 'workbook', label: 'Workbook Lengkap', desc: 'Portal_Magang_Export.xlsx', filename: 'Portal_Magang_Export.xlsx', onClick: handleWorkbook },
     { key: 'attendance', label: 'Data Absensi', desc: 'Absensi.xlsx', filename: 'Absensi.xlsx', onClick: handleAttendance },
     { key: 'seminar', label: 'Absensi Seminar', desc: 'Absensi_Seminar.xlsx', filename: 'Absensi_Seminar.xlsx', onClick: handleSeminar },
     { key: 'tiktok', label: 'Video Viralisasi', desc: 'Video_Viralisasi.xlsx', filename: 'Video_Viralisasi.xlsx', onClick: handleTikTok },

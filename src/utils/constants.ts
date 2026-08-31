@@ -10,20 +10,22 @@ export const SESSION_CONFIG = {
 
 export type SessionKey = keyof typeof SESSION_CONFIG;
 
-// Buka/tutup absensi berdasarkan waktu (dalam Asia/Jakarta).
-// Menggunakan Date lokal yang sudah dikonversi ke zona WIB oleh helper.
-export function evalSessionWindow(nowWib: Date, sessionKey: SessionKey) {
-  const cfg = SESSION_CONFIG[sessionKey];
+export function evalSessionWindowByConfig(nowWib: Date, start: string, end: string) {
   const time = nowWib.getHours() * 3600 + nowWib.getMinutes() * 60 + nowWib.getSeconds();
-  const [sh, sm, ss] = cfg.start.split(':').map(Number);
-  const [eh, em, es] = cfg.end.split(':').map(Number);
+  const [sh, sm, ss] = start.split(':').map(Number);
+  const [eh, em, es] = end.split(':').map(Number);
   const startSec = sh * 3600 + sm * 60 + ss;
   const endSec = eh * 3600 + em * 60 + es;
   return {
     isOpen: time >= startSec && time <= endSec,
-    start: cfg.start,
-    end: cfg.end,
+    start,
+    end,
   };
+}
+
+export function evalSessionWindow(nowWib: Date, sessionKey: SessionKey) {
+  const cfg = SESSION_CONFIG[sessionKey];
+  return evalSessionWindowByConfig(nowWib, cfg.start, cfg.end);
 }
 
 // Waktu server (dari Supabase) dalam zona Asia/Jakarta sebagai Date

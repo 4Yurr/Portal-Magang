@@ -12,6 +12,7 @@ const navItems = [
   { to: '/admin/bpu', label: 'Akuisisi Data BPU' },
   { to: '/admin/pu', label: 'Akuisisi Data PU' },
   { to: '/admin/materi', label: 'Materi PDF' },
+  { to: '/admin/pengaturan', label: 'Pengaturan' },
   { to: '/admin/export', label: 'Export Data' },
 ];
 
