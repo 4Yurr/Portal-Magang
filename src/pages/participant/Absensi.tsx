@@ -7,7 +7,7 @@ import { ParticipantSearch } from '../../components/ui/ParticipantSearch';
 import { Spinner } from '../../components/ui/Spinner';
 import type { GeoLocation } from '../../types';
 import { fetchAttendanceSettings } from '../../services/adminService';
-import { getServerWib, submitAttendance, uploadAttendancePhoto } from '../../services/participantService';
+import { getServerWib, submitAttendance, uploadFile } from '../../services/participantService';
 import { evalSessionWindowByConfig, wibDateString, wibTimeString, isValidPhoto, formatBytes } from '../../utils/constants';
 
 export default function Absensi() {
@@ -79,11 +79,19 @@ export default function Absensi() {
       return showToast('Absensi saat ini belum dibuka. Sesi Pagi 08:00-09:30 atau Sesi Sore 15:30-17:00 WIB.', 'error');
     }
     if (!location) return showToast('Silakan klik Ambil Lokasi terlebih dahulu', 'error');
-    if (!photo) return showToast('Foto kegiatan wajib diambil', 'error');
+    if (!photo) return showToast('Foto kegiatan wajib dipilih', 'error');
 
     const session = activeSession;
     setSubmitting(true);
     try {
+      const extension = photo.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const filename = `${selected.nim}_${wibDateString(now)}_${session}_${Date.now()}.${extension}`;
+      const photoUp = await uploadFile('attendance-photos', filename, photo);
+      if (!photoUp.path) {
+        showToast('Gagal mengunggah foto: ' + (photoUp.error ?? 'unknown'), 'error');
+        return;
+      }
+
       const res = await submitAttendance({
         participant_id: selected.nim,
         tanggal: wibDateString(now),
@@ -92,28 +100,16 @@ export default function Absensi() {
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
-        file: null,
+        file: {
+          bucket: 'attendance-photos',
+          path: photoUp.path,
+          filename: photo.name,
+          mimeType: photo.type || 'image/jpeg',
+          size: photo.size,
+        },
       });
 
-      if (res.success) {
-        // Upload foto ke Google Drive (opsional; gagal tidak membatalkan absensi)
-        const photoUp = await uploadAttendancePhoto({
-          nim: selected.nim,
-          tanggal: wibDateString(now),
-          session: session as 'PAGI' | 'SORE',
-          jenis: 'biasa',
-          filename: photo.name,
-          file: photo,
-        });
-        if (!photoUp.ok) {
-          console.error('Drive photo upload failed:', photoUp.error);
-          showToast('Absensi tercatat, tapi foto gagal diunggah ke Drive.', 'info');
-        } else {
-          showToast(res.message, 'success');
-        }
-      } else {
-        showToast(res.message, 'error');
-      }
+      showToast(res.message, res.success ? 'success' : 'error');
 
       if (res.success) {
         clear();
@@ -191,16 +187,15 @@ export default function Absensi() {
 
         <fieldset>
           <legend>3. Foto Kegiatan</legend>
-          <label>Foto Selfie di Lokasi *</label>
+          <label>Foto Kegiatan *</label>
           <div className="file-dropzone" onClick={() => document.getElementById('abs-photo')?.click()}>
-            <span className="dropzone-icon">📷</span>
-            <div className="dropzone-label">Ambil Foto / Pilih Gambar</div>
-            <div className="dropzone-sub">Format JPEG/PNG, selfie di lokasi kegiatan</div>
+            <span className="dropzone-icon">🖼️</span>
+            <div className="dropzone-label">Pilih Foto</div>
+            <div className="dropzone-sub">Format JPEG/PNG, maksimal sesuai ketentuan foto</div>
             <input
               id="abs-photo"
               type="file"
               accept="image/*"
-              capture="environment"
               style={{ display: 'none' }}
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
