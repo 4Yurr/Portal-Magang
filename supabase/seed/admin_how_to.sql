@@ -9,8 +9,9 @@
 --            admin@bpjs-magang.test
 --            password: <buat password kuat>
 --
--- LANGKAH 2: Jalankan query berikut di SQL Editor untuk memasukkan email tsb
---            ke tabel admin_roles (ROLE DIPERLUKAN AGAR RLS MENGIZINKAN AKSES):
+-- LANGKAH 2: Untuk database yang sudah menjalankan migration 0006, role admin
+--            dibuat otomatis saat user Auth dibuat. Untuk database lama atau
+--            untuk menjadikan user sebagai superadmin, jalankan query berikut:
 --
 INSERT INTO public.admin_roles (email, role) VALUES ('admin@bpjs-magang.test', 'superadmin');
 
@@ -18,7 +19,7 @@ INSERT INTO public.admin_roles (email, role) VALUES ('admin@bpjs-magang.test', '
 --            Setelah login, Anda bisa mengelola semua data (peserta, absensi,
 --            laporan, BPU, PU, dsb).
 --
--- NOTE: Hanya email yang terdaftar di tabel admin_roles yang dianggap admin.
---       User auth yang tidak ada di admin_roles TIDAK bisa membaca data
---       sensitif (NIK BPU/PU, log, dsb) karena diblokir oleh RLS.
+-- NOTE: Setelah migration 0006, setiap user Auth otomatis memiliki role admin.
+--       User yang dibuat sebelum migration tersebut ikut diperbaiki melalui
+--       backfill di migration. Role tetap dikontrol oleh tabel admin_roles.
 -- ============================================================================
