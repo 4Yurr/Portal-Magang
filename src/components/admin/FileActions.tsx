@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Spinner } from '../ui/Spinner';
 import { useToast } from '../ui/Toast';
 import { getSignedDownloadUrl } from '../../services/adminService';
+import { supabase } from '../../lib/supabaseClient';
 
 export function DownloadButton({ storagePath, filename, label = 'Download' }: {
   storagePath: string;
@@ -40,16 +41,38 @@ export function PhotoViewModal({ storagePath, filename, onClose }: {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    const handleViewPhoto = async () => {
       if (!storagePath) {
         setLoading(false);
         return;
       }
-      setUrl(await getSignedDownloadUrl(storagePath, filename ?? 'foto'));
-      setLoading(false);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storagePath]);
+
+      try {
+        if (/^https?:\/\//i.test(storagePath)) {
+          setUrl(storagePath);
+          return;
+        }
+
+        const separator = storagePath.indexOf('/');
+        if (separator <= 0) throw new Error('Invalid storage path');
+
+        const bucket = storagePath.slice(0, separator);
+        const path = storagePath.slice(separator + 1);
+        const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(path);
+        const photoUrl = bucket === 'attendance-photos'
+          ? await getSignedDownloadUrl(storagePath, filename ?? 'foto')
+          : publicData.publicUrl;
+        setUrl(photoUrl);
+      } catch (error) {
+        console.error('Photo preview error:', error);
+        setUrl(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    handleViewPhoto();
+  }, [filename, storagePath]);
 
   if (!storagePath) return null;
 

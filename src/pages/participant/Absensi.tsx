@@ -84,9 +84,12 @@ export default function Absensi() {
     const session = activeSession;
     setSubmitting(true);
     try {
-      const extension = photo.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const filename = `${selected.nim}_${wibDateString(now)}_${session}_${Date.now()}.${extension}`;
-      const photoUp = await uploadFile('attendance-photos', filename, photo);
+      const originalFilename = photo.name;
+      const extension = originalFilename.includes('.') ? `.${originalFilename.split('.').pop()}` : '.jpg';
+      const safeName = selected.nama.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const newFileName = `${safeName || selected.nim}_${wibDateString(now)}${extension}`;
+      const renamedPhoto = new File([photo], newFileName, { type: photo.type });
+      const photoUp = await uploadFile('attendance-photos', newFileName, renamedPhoto);
       if (!photoUp.path) {
         showToast('Gagal mengunggah foto: ' + (photoUp.error ?? 'unknown'), 'error');
         return;
@@ -103,9 +106,9 @@ export default function Absensi() {
         file: {
           bucket: 'attendance-photos',
           path: photoUp.path,
-          filename: photo.name,
-          mimeType: photo.type || 'image/jpeg',
-          size: photo.size,
+          filename: newFileName,
+          mimeType: renamedPhoto.type || 'image/jpeg',
+          size: renamedPhoto.size,
         },
       });
 
