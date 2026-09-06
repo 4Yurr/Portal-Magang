@@ -195,7 +195,7 @@ export default function Absensi() {
         <fieldset>
           <legend>3. Foto Kegiatan</legend>
           <label>Foto Kegiatan *</label>
-          <div className="file-dropzone" onClick={() => document.getElementById('abs-photo')?.click()}>
+          <label className="file-dropzone" htmlFor="abs-photo">
             <span className="dropzone-icon">🖼️</span>
             <div className="dropzone-label">Pilih Foto</div>
             <div className="dropzone-sub">Format JPEG/PNG, maksimal sesuai ketentuan foto</div>
@@ -203,7 +203,7 @@ export default function Absensi() {
               id="abs-photo"
               type="file"
               accept="image/*"
-              style={{ display: 'none' }}
+              className="file-input-visually-hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
                 if (f && !isValidPhoto(f)) {
@@ -222,7 +222,7 @@ export default function Absensi() {
                 </div>
               </div>
             )}
-          </div>
+          </label>
         </fieldset>
 
         <button className="btn btn-primary btn-submit" onClick={handleSubmit} disabled={submitting}>

@@ -149,7 +149,7 @@ export default function Seminar() {
         <fieldset>
           <legend>4. Foto Kegiatan</legend>
           <label>Foto Selfie di Lokasi Seminar *</label>
-          <div className="file-dropzone" onClick={() => document.getElementById('seminar-photo')?.click()}>
+          <label className="file-dropzone" htmlFor="seminar-photo">
             <span className="dropzone-icon">📷</span>
             <div className="dropzone-label">Ambil Foto / Pilih Gambar</div>
             <div className="dropzone-sub">Foto selfie jelas di lokasi seminar</div>
@@ -157,7 +157,7 @@ export default function Seminar() {
               id="seminar-photo"
               type="file"
               accept="image/*"
-              style={{ display: 'none' }}
+              className="file-input-visually-hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
                 if (f && !isValidPhoto(f)) {
@@ -174,7 +174,7 @@ export default function Seminar() {
                 <div style={{ marginTop: 6 }}>{photo?.name}</div>
               </div>
             )}
-          </div>
+          </label>
         </fieldset>
 
         <button className="btn btn-primary btn-submit" onClick={handleSubmit} disabled={submitting}>
