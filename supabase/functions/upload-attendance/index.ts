@@ -18,6 +18,7 @@ function getFolderIdForJenis(jenis: string): string {
 
 function resolveContentType(typeFromQuery: string, ext: string): string {
   const t = typeFromQuery.toLowerCase()
+  if (t.startsWith('image/')) return t
   if (t.includes('png')) return 'image/png'
   if (t.includes('gif')) return 'image/gif'
   if (t.includes('webp')) return 'image/webp'
@@ -34,6 +35,13 @@ function resolveContentType(typeFromQuery: string, ext: string): string {
   if (ext === 'heif') return 'image/heif'
   if (ext === 'pdf') return 'application/pdf'
   return 'image/jpeg'
+}
+
+function resolveFileExtension(filename: string, contentType: string): string {
+  const filenameMatch = filename.toLowerCase().match(/\.([a-z0-9]{1,10})$/)
+  if (filenameMatch) return `.${filenameMatch[1]}`
+  const typeMatch = contentType.match(/^image\/([a-z0-9.+-]+)$/i)
+  return typeMatch ? `.${typeMatch[1].replace('jpeg', 'jpg')}` : '.jpg'
 }
 
 
@@ -155,7 +163,7 @@ serve(async (req) => {
     const typeFromQuery = url.searchParams.get('type') || ''
     const ext = originalFilename.includes('.') ? originalFilename.split('.').pop()!.toLowerCase() : ''
     const contentType = resolveContentType(typeFromQuery, ext)
-    const safeExt = contentType.includes('png') ? '.png' : contentType.includes('pdf') ? '.pdf' : '.jpg'
+    const safeExt = resolveFileExtension(originalFilename, contentType)
 
     let driveFilename = ''
     if (jenis === 'bpu' || jenis === 'pu') {

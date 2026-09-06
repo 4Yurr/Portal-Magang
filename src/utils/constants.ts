@@ -133,5 +133,6 @@ export function isValidPdf(file: File): boolean {
 }
 
 export function isValidPhoto(file: File): boolean {
-  return file.type.startsWith('image/');
+  if (file.type.toLowerCase().startsWith('image/')) return true;
+  return /\.(avif|bmp|gif|heic|heif|ico|jfif|jpe?g|png|svg|tif?f|webp)$/i.test(file.name);
 }
