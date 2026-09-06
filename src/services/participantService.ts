@@ -154,7 +154,7 @@ export async function uploadFile(
 ): Promise<{ path: string | null; error: string | null }> {
   const { error } = await supabase.storage.from(bucket).upload(path, file, {
     cacheControl: '3600',
-    upsert: false,
+    upsert: true,
     contentType: file.type,
   });
   if (error) {

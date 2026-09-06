@@ -84,15 +84,22 @@ export default function Absensi() {
     const session = activeSession;
     setSubmitting(true);
     try {
-      const originalFilename = photo.name;
-      const extension = originalFilename.includes('.') ? `.${originalFilename.split('.').pop()}` : '.jpg';
-      const safeName = selected.nama.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const newFileName = `${safeName || selected.nim}_${wibDateString(now)}${extension}`;
+      const fileExtension = photo.name.includes('.') ? photo.name.split('.').pop()?.toLowerCase() : 'jpg';
+      const userId = selected.nim.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+      const newFileName = `${userId}_${new Date().toISOString().split('T')[0]}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension || 'jpg'}`;
       const renamedPhoto = new File([photo], newFileName, { type: photo.type });
       const photoUp = await uploadFile('attendance-photos', newFileName, renamedPhoto);
+      let storedFile = null;
       if (!photoUp.path) {
-        showToast('Gagal mengunggah foto: ' + (photoUp.error ?? 'unknown'), 'error');
-        return;
+        showToast(`Foto gagal diunggah, tetapi absensi tetap akan dicatat: ${photoUp.error ?? 'unknown'}`, 'error');
+      } else {
+        storedFile = {
+          bucket: 'attendance-photos',
+          path: photoUp.path,
+          filename: newFileName,
+          mimeType: renamedPhoto.type || 'image/jpeg',
+          size: renamedPhoto.size,
+        };
       }
 
       const res = await submitAttendance({
@@ -103,16 +110,13 @@ export default function Absensi() {
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
-        file: {
-          bucket: 'attendance-photos',
-          path: photoUp.path,
-          filename: newFileName,
-          mimeType: renamedPhoto.type || 'image/jpeg',
-          size: renamedPhoto.size,
-        },
+        file: storedFile,
       });
 
-      showToast(res.message, res.success ? 'success' : 'error');
+      showToast(
+        res.success && !photoUp.path ? `${res.message} Foto bukti belum tersimpan.` : res.message,
+        res.success ? 'success' : 'error',
+      );
 
       if (res.success) {
         clear();

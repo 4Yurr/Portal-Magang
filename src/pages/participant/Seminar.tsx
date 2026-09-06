@@ -157,7 +157,6 @@ export default function Seminar() {
               id="seminar-photo"
               type="file"
               accept="image/*"
-              capture="environment"
               style={{ display: 'none' }}
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
