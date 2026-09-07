@@ -89,18 +89,17 @@ export default function Absensi() {
       const newFileName = `${userId}_${new Date().toISOString().split('T')[0]}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension || 'jpg'}`;
       const renamedPhoto = new File([photo], newFileName, { type: photo.type });
       const photoUp = await uploadFile('attendance-photos', newFileName, renamedPhoto);
-      let storedFile = null;
       if (!photoUp.path) {
-        showToast(`Foto gagal diunggah, tetapi absensi tetap akan dicatat: ${photoUp.error ?? 'unknown'}`, 'error');
-      } else {
-        storedFile = {
-          bucket: 'attendance-photos',
-          path: photoUp.path,
-          filename: newFileName,
-          mimeType: renamedPhoto.type || 'image/jpeg',
-          size: renamedPhoto.size,
-        };
+        showToast(`Foto gagal diunggah. Absensi belum disimpan: ${photoUp.error ?? 'unknown'}`, 'error');
+        return;
       }
+      const storedFile = {
+        bucket: 'attendance-photos',
+        path: photoUp.path,
+        filename: newFileName,
+        mimeType: renamedPhoto.type || 'image/jpeg',
+        size: renamedPhoto.size,
+      };
 
       const res = await submitAttendance({
         participant_id: selected.nim,
@@ -113,10 +112,7 @@ export default function Absensi() {
         file: storedFile,
       });
 
-      showToast(
-        res.success && !photoUp.path ? `${res.message} Foto bukti belum tersimpan.` : res.message,
-        res.success ? 'success' : 'error',
-      );
+      showToast(res.message, res.success ? 'success' : 'error');
 
       if (res.success) {
         clear();
