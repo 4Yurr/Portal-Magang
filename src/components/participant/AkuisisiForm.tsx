@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
 import { uploadFile, submitAkuisisi, uploadAkuisisiFileToDrive } from '../../services/participantService';
-import { isValidNIK, MAX_REPORT_SIZE } from '../../utils/constants';
+import { isValidNIK, isValidPdf, MAX_REPORT_SIZE } from '../../utils/constants';
 
 const KELOMPOK = Array.from({ length: 10 }, (_, i) => String(i + 1));
 
@@ -50,6 +50,7 @@ export function AkuisisiForm({ type }: Props) {
     if (!isValidNIK(nik)) return showToast('NIK harus 16 digit angka', 'error');
     if (!jenisKelamin) return showToast('Pilih jenis kelamin', 'error');
     if (!file) return showToast('File wajib diunggah', 'error');
+    if (!isValidPdf(file)) return showToast('Scan formulir dan KTP harus digabung menjadi satu file PDF', 'error');
 
     setSubmitting(true);
     try {
@@ -167,15 +168,15 @@ export function AkuisisiForm({ type }: Props) {
             <option value="Perempuan">Perempuan</option>
           </select>
 
-          <label>Upload File {type} *</label>
+          <label>Scan Formulir dan KTP Jadikan Satu PDF ({type}) *</label>
           <div className="file-dropzone" onClick={() => document.getElementById('akuisisi-file')?.click()}>
             <span className="dropzone-icon">📄</span>
-            <div className="dropzone-label">Pilih File {type} (PDF / Foto)</div>
-            <div className="dropzone-sub">Dokumen formulir atau foto bukti {type} (maks 10 MB)</div>
+            <div className="dropzone-label">Pilih Satu File PDF {type}</div>
+            <div className="dropzone-sub">Gabungkan scan formulir dan KTP menjadi satu PDF (maks 10 MB)</div>
             <input
               id="akuisisi-file"
               type="file"
-              accept=".pdf,image/*,application/pdf"
+              accept=".pdf,application/pdf"
               style={{ display: 'none' }}
               onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
             />

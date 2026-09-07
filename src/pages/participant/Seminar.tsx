@@ -6,7 +6,7 @@ import { LocationPicker } from '../../components/participant/LocationPicker';
 import { ParticipantSearch } from '../../components/ui/ParticipantSearch';
 import { Spinner } from '../../components/ui/Spinner';
 import type { GeoLocation } from '../../types';
-import { getServerWib, submitSeminar, uploadAttendancePhoto } from '../../services/participantService';
+import { getServerWib, submitSeminar, uploadFile } from '../../services/participantService';
 import { wibDateString, wibTimeString, isValidPhoto } from '../../utils/constants';
 
 export default function Seminar() {
@@ -48,6 +48,16 @@ export default function Seminar() {
 
     setSubmitting(true);
     try {
+      const fileExtension = photo.name.includes('.') ? photo.name.split('.').pop()?.toLowerCase() : 'jpg';
+      const userId = selected.nim.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+      const newFileName = `${userId}_seminar_${new Date().toISOString().split('T')[0]}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension || 'jpg'}`;
+      const renamedPhoto = new File([photo], newFileName, { type: photo.type });
+      const photoUp = await uploadFile('attendance-photos', newFileName, renamedPhoto);
+      if (!photoUp.path) {
+        showToast(`Foto seminar gagal diunggah. Absensi belum disimpan: ${photoUp.error ?? 'unknown'}`, 'error');
+        return;
+      }
+
       const res = await submitSeminar({
         participant_id: selected.nim,
         kegiatan: kegiatan.trim(),
@@ -56,28 +66,16 @@ export default function Seminar() {
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
-        file: null,
+        file: {
+          bucket: 'attendance-photos',
+          path: photoUp.path,
+          filename: newFileName,
+          mimeType: renamedPhoto.type || 'image/jpeg',
+          size: renamedPhoto.size,
+        },
       });
 
-      if (res.success) {
-        // Upload foto ke Google Drive (opsional; gagal tidak membatalkan absensi)
-        const photoUp = await uploadAttendancePhoto({
-          nim: selected.nim,
-          tanggal: wibDateString(now),
-          kegiatan: kegiatan.trim(),
-          jenis: 'seminar',
-          filename: photo.name,
-          file: photo,
-        });
-        if (!photoUp.ok) {
-          console.error('Drive photo upload failed:', photoUp.error);
-          showToast('Absensi tercatat, tapi foto gagal diunggah ke Drive.', 'info');
-        } else {
-          showToast(res.message, 'success');
-        }
-      } else {
-        showToast(res.message, 'error');
-      }
+      showToast(res.message, res.success ? 'success' : 'error');
 
       if (res.success) {
         clear();
