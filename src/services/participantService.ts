@@ -151,10 +151,11 @@ export async function uploadFile(
   bucket: string,
   path: string,
   file: File,
+  upsert = true,
 ): Promise<{ path: string | null; error: string | null }> {
   const { error } = await supabase.storage.from(bucket).upload(path, file, {
     cacheControl: '3600',
-    upsert: true,
+    upsert,
     contentType: file.type,
   });
   if (error) {

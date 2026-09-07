@@ -52,7 +52,7 @@ export default function Seminar() {
       const userId = selected.nim.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
       const newFileName = `${userId}_seminar_${new Date().toISOString().split('T')[0]}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension || 'jpg'}`;
       const renamedPhoto = new File([photo], newFileName, { type: photo.type });
-      const photoUp = await uploadFile('attendance-photos', newFileName, renamedPhoto);
+      const photoUp = await uploadFile('attendance-photos', newFileName, renamedPhoto, false);
       if (!photoUp.path) {
         showToast(`Foto seminar gagal diunggah. Absensi belum disimpan: ${photoUp.error ?? 'unknown'}`, 'error');
         return;
