@@ -15,6 +15,7 @@ import Login from './pages/admin/Login';
 import Dashboard from './pages/admin/Dashboard';
 import Peserta from './pages/admin/Peserta';
 import AdminAbsensi from './pages/admin/AdminAbsensi';
+import AdminRekapAbsensi from './pages/admin/AdminRekapAbsensi';
 import AdminSeminar from './pages/admin/AdminSeminar';
 import AdminViralisasi from './pages/admin/AdminViralisasi';
 import AdminLaporan from './pages/admin/AdminLaporan';
@@ -68,6 +69,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="peserta" element={<Peserta />} />
           <Route path="absensi" element={<AdminAbsensi />} />
+          <Route path="absensi-biasa" element={<AdminRekapAbsensi />} />
           <Route path="seminar" element={<AdminSeminar />} />
           <Route path="viralisasi" element={<AdminViralisasi />} />
           <Route path="laporan" element={<AdminLaporan />} />

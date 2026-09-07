@@ -746,6 +746,19 @@ input[readonly] {
 .data-table tr:hover td {
   background: #f8fbfe;
 }
+.recap-table {
+  min-width: max-content;
+}
+.recap-table th,
+.recap-table td {
+  text-align: center;
+  white-space: nowrap;
+}
+.recap-table th:nth-child(2),
+.recap-table td:nth-child(2) {
+  text-align: left;
+  min-width: 220px;
+}
 
 /* Badges */
 .badge {

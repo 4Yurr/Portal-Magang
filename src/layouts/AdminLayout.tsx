@@ -5,7 +5,8 @@ import { signOut } from '../services/adminService';
 const navItems = [
   { to: '/admin', label: 'Dashboard', end: true },
   { to: '/admin/peserta', label: 'Peserta' },
-  { to: '/admin/absensi', label: 'Absensi' },
+  { to: '/admin/absensi', label: 'Log Absen' },
+  { to: '/admin/absensi-biasa', label: 'Absen Biasa' },
   { to: '/admin/seminar', label: 'Absensi Seminar' },
   { to: '/admin/viralisasi', label: 'Video Viralisasi' },
   { to: '/admin/laporan', label: 'Laporan' },

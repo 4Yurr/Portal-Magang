@@ -103,7 +103,7 @@ export default function AdminAbsensi() {
 
   return (
     <div>
-      <h2 className="admin-title">Data Absensi</h2>
+      <h2 className="admin-title">Log Absen</h2>
 
       <div className="panel">
         <div className="panel-toolbar">
