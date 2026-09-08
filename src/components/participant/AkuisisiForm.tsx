@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
-import { uploadFile, submitAkuisisi, uploadAkuisisiFileToDrive } from '../../services/participantService';
+import { uploadFile, uploadAkuisisiFileToDrive } from '../../services/participantService';
 import { isValidNIK, isValidPdf, MAX_REPORT_SIZE } from '../../utils/constants';
 
 const KELOMPOK = Array.from({ length: 10 }, (_, i) => String(i + 1));
@@ -63,43 +63,27 @@ export function AkuisisiForm({ type }: Props) {
         return;
       }
 
-      const res = await submitAkuisisi(type === 'BPU' ? 'akuisisi_bpu' : 'akuisisi_pu', {
-        kelompok,
-        nama_ktp: namaKtp.trim(),
-        nik: nik.trim(),
-        jenis_kelamin: jenisKelamin as 'Laki-laki' | 'Perempuan',
-        file: {
-          bucket,
-          path: filename,
-          filename: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          size: file.size,
-        },
-      });
-
-      if (res.success && res.id) {
-        const driveUp = await uploadAkuisisiFileToDrive({
-          id: res.id,
+      const driveUp = await uploadAkuisisiFileToDrive({
+          id: crypto.randomUUID(),
           kelompok,
           jenis: type.toLowerCase() as 'bpu' | 'pu',
           filename: file.name,
           file,
+          namaKtp: namaKtp.trim(),
+          nik: nik.trim(),
+          jenisKelamin: jenisKelamin as 'Laki-laki' | 'Perempuan',
+          storagePath: `${bucket}/${filename}`,
         });
 
-        if (!driveUp.ok) {
-          console.error('Google Drive upload failed:', driveUp.error);
-          showToast('Data disimpan, tapi gagal mengunggah ke Google Drive.', 'info');
-        } else {
-          showToast('Data dan file Google Drive berhasil disimpan.', 'success');
-        }
-
+      if (!driveUp.ok) {
+        showToast(`Gagal menyimpan data dan file: ${driveUp.error}`, 'error');
+      } else {
+        showToast('Data dan file Google Drive berhasil disimpan.', 'success');
         setKelompok('');
         setNamaKtp('');
         setNik('');
         setJenisKelamin('');
         handleFile(null);
-      } else {
-        showToast(res.message || 'Gagal menyimpan data.', 'error');
       }
     } catch (e) {
       console.error(`${type} submit error:`, e);

@@ -88,7 +88,11 @@ export async function uploadAkuisisiFileToDrive(opts: {
   jenis: 'bpu' | 'pu';
   filename: string;
   file: File;
-}): Promise<{ ok: boolean; error: string }> {
+  namaKtp: string;
+  nik: string;
+  jenisKelamin: 'Laki-laki' | 'Perempuan';
+  storagePath: string;
+}): Promise<{ ok: boolean; error: string; id?: string }> {
   try {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -97,6 +101,12 @@ export async function uploadAkuisisiFileToDrive(opts: {
       kelompok: opts.kelompok,
       jenis: opts.jenis,
       filename: opts.filename,
+      nama_ktp: opts.namaKtp,
+      nik: opts.nik,
+      jenis_kelamin: opts.jenisKelamin,
+      storage_path: opts.storagePath,
+      mime_type: opts.file.type || 'application/octet-stream',
+      size_bytes: String(opts.file.size),
     });
     if (opts.file.type) qs.set('type', opts.file.type);
     const res = await fetch(
@@ -114,7 +124,7 @@ export async function uploadAkuisisiFileToDrive(opts: {
     if (!res.ok || !data.ok) {
       return { ok: false, error: data.error || `HTTP ${res.status}` };
     }
-    return { ok: true, error: '' };
+    return { ok: true, error: '', id: data.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -328,7 +338,7 @@ export async function submitAkuisisi(
     filename: payload.file.filename,
     mime_type: payload.file.mimeType,
     size_bytes: payload.file.size,
-  }).select('id').single();
+  });
   if (error) {
     console.error(`submitAkuisisi (${table}) error:`, error);
     return { success: false, message: `Gagal menyimpan data: ${error.message}` };

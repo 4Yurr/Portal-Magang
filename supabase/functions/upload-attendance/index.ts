@@ -142,6 +142,11 @@ serve(async (req) => {
     const kegiatan = url.searchParams.get('kegiatan') || ''
     const id = url.searchParams.get('id') || ''
     const kelompok = url.searchParams.get('kelompok') || ''
+    const namaKtp = url.searchParams.get('nama_ktp') || ''
+    const nik = url.searchParams.get('nik') || ''
+    const jenisKelamin = url.searchParams.get('jenis_kelamin') || ''
+    const storagePath = url.searchParams.get('storage_path') || ''
+    const sizeBytes = Number(url.searchParams.get('size_bytes') || '0')
 
     if ((jenis === 'biasa' || jenis === 'seminar') && (!participantId || !tanggal)) {
       return json({ ok: false, error: 'Missing nim/tanggal' }, CORS_HEADERS, 400)
@@ -151,6 +156,9 @@ serve(async (req) => {
     }
     if ((jenis === 'bpu' || jenis === 'pu') && !id) {
       return json({ ok: false, error: 'Missing record id for BPU/PU' }, CORS_HEADERS, 400)
+    }
+    if ((jenis === 'bpu' || jenis === 'pu') && (!kelompok || !namaKtp || !/^\d{16}$/.test(nik) || !storagePath || !['Laki-laki', 'Perempuan'].includes(jenisKelamin))) {
+      return json({ ok: false, error: 'Missing or invalid BPU/PU participant data' }, CORS_HEADERS, 400)
     }
 
     const blob = await req.blob()
@@ -186,6 +194,36 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceRole)
 
     const photoUrl = `https://drive.google.com/uc?export=view&id=${driveFileId}`
+
+    if (jenis === 'bpu' || jenis === 'pu') {
+      const dbTable = jenis === 'bpu' ? 'akuisisi_bpu' : 'akuisisi_pu'
+      const { error: insertError } = await adminClient
+        .from(dbTable)
+        .insert({
+          id,
+          kelompok,
+          nama_ktp: namaKtp,
+          nik,
+          jenis_kelamin: jenisKelamin,
+          storage_path: storagePath,
+          filename: originalFilename,
+          mime_type: typeFromQuery || 'application/pdf',
+          size_bytes: sizeBytes || blob.size,
+          drive_file_id: driveFileId,
+          drive_url: photoUrl,
+        })
+
+      if (insertError) {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        throw new Error(`DB insert failed: ${insertError.message}`)
+      }
+
+      return json({ ok: true, id, driveFileId, photoUrl }, CORS_HEADERS, 200)
+    }
+
     const updates: Record<string, unknown> = {
       photo_path: photoUrl,
       photo_filename: originalFilename,
@@ -199,15 +237,6 @@ serve(async (req) => {
         .eq('participant_id', participantId)
         .eq('tanggal', tanggal)
         .eq('kegiatan', kegiatan)
-    } else if (jenis === 'bpu' || jenis === 'pu') {
-      const dbTable = jenis === 'bpu' ? 'akuisisi_bpu' : 'akuisisi_pu'
-      query = adminClient
-        .from(dbTable)
-        .update({
-          drive_file_id: driveFileId,
-          drive_url: photoUrl,
-        })
-        .eq('id', id)
     } else {
       query = adminClient
         .from('attendance')
