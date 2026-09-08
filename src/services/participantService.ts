@@ -317,7 +317,9 @@ export async function submitAkuisisi(
     file: StoredFile;
   },
 ): Promise<{ success: boolean; message: string; id?: string }> {
-  const { data, error } = await supabase.from(table).insert({
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from(table).insert({
+    id,
     kelompok: payload.kelompok,
     nama_ktp: payload.nama_ktp,
     nik: payload.nik,
@@ -331,7 +333,7 @@ export async function submitAkuisisi(
     console.error(`submitAkuisisi (${table}) error:`, error);
     return { success: false, message: `Gagal menyimpan data: ${error.message}` };
   }
-  return { success: true, message: 'Data berhasil disimpan.', id: data?.id };
+  return { success: true, message: 'Data berhasil disimpan.', id };
 }
 
 // ============================================================================
