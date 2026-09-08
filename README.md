@@ -52,7 +52,7 @@ src/
 supabase/
   migrations/     0001_initial_schema.sql, 0002_materials_and_functions.sql
   seed/           participants.sql (15 contoh), admin_how_to.sql
-public/materials/ BPU.pdf, PU.pdf (file materi yang disajikan peserta)
+public/materials/ BPU.pdf, PU.pdf, dan brosur BPJS 2026 (file materi yang disajikan peserta)
 ```
 
 ---
@@ -67,10 +67,17 @@ public/materials/ BPU.pdf, PU.pdf (file materi yang disajikan peserta)
 3. **(Opsional) Seed peserta contoh**: jalankan `supabase/seed/participants.sql`
    untuk 15 peserta, atau isi sendiri tabel `public.participants`.
 
-### Upload file materi (BPU.pdf / PU.pdf)
+### File materi lokal
 
-File sudah ada di `public/materials/` (disajikan statis oleh Vite). Supabase juga menyimpan metadata `materials`
-(fungsi, definisi di `0001/0002`):
+File PDF lokal di `public/materials/` disajikan langsung oleh Vite dan otomatis muncul di halaman Materi:
+
+- `BPU.pdf`
+- `PU.pdf`
+- `FA Brosur BPU_2026.pdf`
+- `FA Brosur PU Mikro_2026.pdf`
+- `FA Brosur PU UMB_2026.pdf`
+
+Supabase juga menyimpan metadata `materials` untuk materi tambahan yang dikelola admin:
 
 1. Di Dashboard Supabase → **Storage** → bucket `materials` (otomatis dibuat oleh migrasi, publik).
 2. Upload `BPU.pdf` dan `PU.pdf` ke dalamnya, sesuaikan dengan `storage_path`/`filename` di tabel `materials`.

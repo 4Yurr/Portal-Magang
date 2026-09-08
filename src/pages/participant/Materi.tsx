@@ -3,6 +3,58 @@ import { useNavigate } from 'react-router-dom';
 import { MaterialRow } from '../../types';
 import { getMaterials, materialPublicUrl } from '../../services/participantService';
 
+const localMaterials: MaterialRow[] = [
+  {
+    id: 'local-bpu',
+    slug: 'bpu',
+    title: 'Formulir / Materi Acuan BPU',
+    description: 'Formulir dan materi acuan pendataan Bukan Penerima Upah (BPU).',
+    storage_path: 'BPU.pdf',
+    filename: 'BPU.pdf',
+    is_active: true,
+  },
+  {
+    id: 'local-pu',
+    slug: 'pu',
+    title: 'Formulir / Materi Acuan PU',
+    description: 'Formulir dan materi acuan pendataan Penerima Upah (PU).',
+    storage_path: 'PU.pdf',
+    filename: 'PU.pdf',
+    is_active: true,
+  },
+  {
+    id: 'local-brosur-bpu-2026',
+    slug: 'brosur-bpu-2026',
+    title: 'Brosur BPU 2026',
+    description: 'Informasi program BPJS Ketenagakerjaan untuk pekerja bukan penerima upah.',
+    storage_path: 'FA Brosur BPU_2026.pdf',
+    filename: 'FA Brosur BPU_2026.pdf',
+    is_active: true,
+  },
+  {
+    id: 'local-brosur-pu-mikro-2026',
+    slug: 'brosur-pu-mikro-2026',
+    title: 'Brosur PU Mikro 2026',
+    description: 'Informasi program BPJS Ketenagakerjaan bagi pekerja penerima upah mikro.',
+    storage_path: 'FA Brosur PU Mikro_2026.pdf',
+    filename: 'FA Brosur PU Mikro_2026.pdf',
+    is_active: true,
+  },
+  {
+    id: 'local-brosur-pu-umb-2026',
+    slug: 'brosur-pu-umb-2026',
+    title: 'Brosur PU UMB 2026',
+    description: 'Informasi program BPJS Ketenagakerjaan bagi pekerja penerima upah.',
+    storage_path: 'FA Brosur PU UMB_2026.pdf',
+    filename: 'FA Brosur PU UMB_2026.pdf',
+    is_active: true,
+  },
+];
+
+function localMaterialUrl(filename: string): string {
+  return `/materials/${encodeURIComponent(filename)}`;
+}
+
 export default function Materi() {
   const navigate = useNavigate();
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
@@ -11,7 +63,9 @@ export default function Materi() {
     let mounted = true;
     (async () => {
       const res = await getMaterials();
-      if (mounted) setMaterials(res);
+      const localFilenames = new Set(localMaterials.map((material) => material.filename));
+      const additionalMaterials = res.filter((material) => !localFilenames.has(material.filename));
+      if (mounted) setMaterials([...localMaterials, ...additionalMaterials]);
     })();
     return () => {
       mounted = false;
@@ -52,7 +106,7 @@ export default function Materi() {
             </div>
             <a
               className="btn btn-accent"
-              href={materialPublicUrl(m.storage_path)}
+              href={m.id.startsWith('local-') ? localMaterialUrl(m.filename) : materialPublicUrl(m.storage_path)}
               target="_blank"
               rel="noopener noreferrer"
               download
