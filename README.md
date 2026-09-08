@@ -50,7 +50,7 @@ src/
     admin/        Login, Dashboard, Peserta, AdminAbsensi, AdminSeminar,
                   AdminViralisasi, AdminLaporan, AdminBPU, AdminPU, AdminMateri, ExportData
 supabase/
-  migrations/     0001_initial_schema.sql, 0002_materials_and_functions.sql
+  migrations/     0001-0010 (schema, RLS, storage, and upload fixes)
   seed/           participants.sql (15 contoh), admin_how_to.sql
 public/materials/ BPU.pdf, PU.pdf, dan brosur BPJS 2026 (file materi yang disajikan peserta)
 ```
@@ -63,6 +63,9 @@ public/materials/ BPU.pdf, PU.pdf, dan brosur BPJS 2026 (file materi yang disaji
 2. Buka **SQL Editor**, jalankan file migrasi **secara urut**:
    - `supabase/migrations/0001_initial_schema.sql`
    - `supabase/migrations/0002_materials_and_functions.sql`
+   - Jalankan migration lanjutan `0003` sampai `0010` secara berurutan, terutama
+     `supabase/migrations/0010_fix_public_acquisition_insert.sql` untuk memperbaiki
+     submit data PU/BPU dari peserta tanpa login.
    (Ini membuat tabel, fungsi `is_admin()`, **RLS**, bucket storage, view, dan seed materi.)
 3. **(Opsional) Seed peserta contoh**: jalankan `supabase/seed/participants.sql`
    untuk 15 peserta, atau isi sendiri tabel `public.participants`.
