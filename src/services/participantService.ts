@@ -153,19 +153,18 @@ export async function uploadAkuisisiFileToDrive(opts: {
     }
 
     const message = String(data?.error || `HTTP ${res.status}`);
-    const isExpiredDriveToken = /invalid_grant|expired or revoked|oauth token refresh failed|token has been expired/i.test(message);
-    if (isExpiredDriveToken) {
-      return insertDirectly();
+    const directFallback = await insertDirectly();
+    if (directFallback.ok) {
+      return directFallback;
     }
-
-    return { ok: false, error: message };
+    return { ok: false, error: message || directFallback.error };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    const isDriveNetworkIssue = /oauth|token|drive|fetch|network/i.test(message);
-    if (isDriveNetworkIssue) {
-      return insertDirectly();
+    const directFallback = await insertDirectly();
+    if (directFallback.ok) {
+      return directFallback;
     }
-    return { ok: false, error: message };
+    return { ok: false, error: message || directFallback.error };
   }
 }
 
