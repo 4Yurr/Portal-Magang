@@ -166,34 +166,41 @@ serve(async (req) => {
       return json({ ok: false, error: 'Empty file' }, CORS_HEADERS, 400)
     }
 
-    const folderId = getFolderIdForJenis(jenis)
-    const accessToken = await getAccessToken()
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    const adminClient = createClient(supabaseUrl, serviceRole)
+
     const typeFromQuery = url.searchParams.get('type') || ''
     const ext = originalFilename.includes('.') ? originalFilename.split('.').pop()!.toLowerCase() : ''
     const contentType = resolveContentType(typeFromQuery, ext)
     const safeExt = resolveFileExtension(originalFilename, contentType)
 
-    let driveFilename = ''
-    if (jenis === 'bpu' || jenis === 'pu') {
-      driveFilename = `${jenis.toUpperCase()}_Kelompok_${kelompok}_${id}${safeExt}`
-    } else {
-      const tag = jenis === 'seminar' ? `seminar_${kegiatan}` : session
-      driveFilename = `${participantId}_${tanggal}_${tag}${safeExt}`
+    let driveFileId: string | null = null
+    let photoUrl: string | null = null
+
+    try {
+      const folderId = getFolderIdForJenis(jenis)
+      const accessToken = await getAccessToken()
+      let driveFilename = ''
+      if (jenis === 'bpu' || jenis === 'pu') {
+        driveFilename = `${jenis.toUpperCase()}_Kelompok_${kelompok}_${id}${safeExt}`
+      } else {
+        const tag = jenis === 'seminar' ? `seminar_${kegiatan}` : session
+        driveFilename = `${participantId}_${tanggal}_${tag}${safeExt}`
+      }
+
+      driveFileId = await uploadToDrive(
+        folderId,
+        accessToken,
+        driveFilename,
+        contentType,
+        new Uint8Array(await blob.arrayBuffer()),
+      )
+      photoUrl = `https://drive.google.com/uc?export=view&id=${driveFileId}`
+    } catch (driveError) {
+      const message = driveError instanceof Error ? driveError.message : String(driveError)
+      console.warn(`Drive upload skipped for ${jenis}: ${message}`)
     }
-
-    const driveFileId = await uploadToDrive(
-      folderId,
-      accessToken,
-      driveFilename,
-      contentType,
-      new Uint8Array(await blob.arrayBuffer()),
-    )
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-    const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-    const adminClient = createClient(supabaseUrl, serviceRole)
-
-    const photoUrl = `https://drive.google.com/uc?export=view&id=${driveFileId}`
 
     if (jenis === 'bpu' || jenis === 'pu') {
       const dbTable = jenis === 'bpu' ? 'akuisisi_bpu' : 'akuisisi_pu'
@@ -214,14 +221,16 @@ serve(async (req) => {
         })
 
       if (insertError) {
-        await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${accessToken}` },
-        })
+        if (driveFileId) {
+          await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${await getAccessToken().catch(() => '')}` || undefined },
+          }).catch(() => undefined)
+        }
         throw new Error(`DB insert failed: ${insertError.message}`)
       }
 
-      return json({ ok: true, id, driveFileId, photoUrl }, CORS_HEADERS, 200)
+      return json({ ok: true, id, driveFileId, photoUrl, driveFallback: !driveFileId }, CORS_HEADERS, 200)
     }
 
     const updates: Record<string, unknown> = {

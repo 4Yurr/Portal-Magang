@@ -93,9 +93,34 @@ export async function uploadAkuisisiFileToDrive(opts: {
   jenisKelamin: 'Laki-laki' | 'Perempuan';
   storagePath: string;
 }): Promise<{ ok: boolean; error: string; id?: string }> {
+  const table = opts.jenis === 'bpu' ? 'akuisisi_bpu' : 'akuisisi_pu';
+  const dbPayload = {
+    id: opts.id,
+    kelompok: opts.kelompok,
+    nama_ktp: opts.namaKtp,
+    nik: opts.nik,
+    jenis_kelamin: opts.jenisKelamin,
+    storage_path: opts.storagePath,
+    filename: opts.filename,
+    mime_type: opts.file.type || 'application/octet-stream',
+    size_bytes: opts.file.size,
+  };
+
+  const insertDirectly = async () => {
+    const { error } = await supabase.from(table).insert(dbPayload);
+    if (error) {
+      return { ok: false, error: error.message, id: undefined };
+    }
+    return { ok: true, error: '', id: opts.id };
+  };
+
   try {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !anonKey) {
+      return insertDirectly();
+    }
+
     const qs = new URLSearchParams({
       id: opts.id,
       kelompok: opts.kelompok,
@@ -109,6 +134,7 @@ export async function uploadAkuisisiFileToDrive(opts: {
       size_bytes: String(opts.file.size),
     });
     if (opts.file.type) qs.set('type', opts.file.type);
+
     const res = await fetch(
       `${supabaseUrl}/functions/v1/upload-attendance?${qs.toString()}`,
       {
@@ -120,13 +146,26 @@ export async function uploadAkuisisiFileToDrive(opts: {
         body: opts.file,
       },
     );
+
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) {
-      return { ok: false, error: data.error || `HTTP ${res.status}` };
+    if (res.ok && data.ok) {
+      return { ok: true, error: '', id: data.id || opts.id };
     }
-    return { ok: true, error: '', id: data.id };
+
+    const message = String(data?.error || `HTTP ${res.status}`);
+    const isExpiredDriveToken = /invalid_grant|expired or revoked|oauth token refresh failed|token has been expired/i.test(message);
+    if (isExpiredDriveToken) {
+      return insertDirectly();
+    }
+
+    return { ok: false, error: message };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    const message = e instanceof Error ? e.message : String(e);
+    const isDriveNetworkIssue = /oauth|token|drive|fetch|network/i.test(message);
+    if (isDriveNetworkIssue) {
+      return insertDirectly();
+    }
+    return { ok: false, error: message };
   }
 }
 

@@ -78,7 +78,7 @@ export function AkuisisiForm({ type }: Props) {
       if (!driveUp.ok) {
         showToast(`Gagal menyimpan data dan file: ${driveUp.error}`, 'error');
       } else {
-        showToast('Data dan file Google Drive berhasil disimpan.', 'success');
+        showToast('Data dan file berhasil disimpan.', 'success');
         setKelompok('');
         setNamaKtp('');
         setNik('');
