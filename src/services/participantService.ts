@@ -306,9 +306,9 @@ export async function submitSeminar(payload: {
 }
 
 // ============================================================================
-// TIKTOK
+// INSTAGRAM
 // ============================================================================
-export async function submitTikTok(payload: {
+export async function submitInstagram(payload: {
   kelompok: string;
   pengirim: string;
   url: string;
@@ -319,10 +319,10 @@ export async function submitTikTok(payload: {
     url: payload.url,
   });
   if (error) {
-    console.error('submitTikTok error:', error);
-    return { success: false, message: 'Gagal menyimpan link TikTok. Silakan coba lagi.' };
+    console.error('submitInstagram error:', error);
+    return { success: false, message: 'Gagal menyimpan link Instagram. Silakan coba lagi.' };
   }
-  return { success: true, message: 'Link TikTok berhasil disimpan.' };
+  return { success: true, message: 'Link Instagram berhasil disimpan.' };
 }
 
 // ============================================================================

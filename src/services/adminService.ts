@@ -5,7 +5,7 @@ import type {
   AttendanceRow,
   SeminarRow,
   ReportRow,
-  TikTokRow,
+  InstagramRow,
   AkuisisiRow,
   Participant,
   MaterialRow,
@@ -187,10 +187,10 @@ export async function fetchSeminar(opts?: {
   return (data ?? []) as SeminarRow[];
 }
 
-export async function fetchTikTok(opts?: {
+export async function fetchInstagram(opts?: {
   search?: string;
   kelompok?: string;
-}): Promise<TikTokRow[]> {
+}): Promise<InstagramRow[]> {
   let q = supabase.from('tiktok_submissions').select('*');
   if (opts?.search) {
     const s = opts.search.trim();
@@ -200,7 +200,7 @@ export async function fetchTikTok(opts?: {
   q = q.order('created_at', { ascending: false });
   const { data, error } = await q;
   if (error) return [];
-  return (data ?? []) as TikTokRow[];
+  return (data ?? []) as InstagramRow[];
 }
 
 export async function fetchReports(opts?: {
@@ -404,7 +404,7 @@ export async function deleteReport(id: string) {
   return supabase.from('reports').delete().eq('id', id);
 }
 
-export async function deleteTikTok(id: string) {
+export async function deleteInstagram(id: string) {
   const { data: beforeData } = await supabase.from('tiktok_submissions').select('*').eq('id', id).single();
   if (beforeData) {
     await writeAuditLog('tiktok_submissions', id, 'DELETE', beforeData, null);
@@ -412,7 +412,7 @@ export async function deleteTikTok(id: string) {
   return supabase.from('tiktok_submissions').delete().eq('id', id);
 }
 
-export async function updateTikTok(id: string, updates: { kelompok?: string; pengirim?: string; url?: string; note?: string }) {
+export async function updateInstagram(id: string, updates: { kelompok?: string; pengirim?: string; url?: string; note?: string }) {
   const { data: beforeData } = await supabase.from('tiktok_submissions').select('*').eq('id', id).single();
   const res = await supabase.from('tiktok_submissions').update(updates).eq('id', id).select().single();
   if (!res.error && beforeData) {

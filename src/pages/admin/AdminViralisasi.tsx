@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
-import { fetchTikTok, deleteTikTok } from '../../services/adminService';
-import type { TikTokRow } from '../../types';
+import { fetchInstagram, deleteInstagram } from '../../services/adminService';
+import type { InstagramRow } from '../../types';
 import { formatDateTime } from '../../utils/constants';
 import { exportToExcel } from '../../utils/excel';
 
 export default function AdminViralisasi() {
   const { showToast } = useToast();
-  const [data, setData] = useState<TikTokRow[]>([]);
+  const [data, setData] = useState<InstagramRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [kelompok, setKelompok] = useState('');
-  const [deleteTarget, setDeleteTarget] = useState<TikTokRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InstagramRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetchTikTok({
+    const res = await fetchInstagram({
       search: search || undefined,
       kelompok: kelompok || undefined,
     });
@@ -26,12 +26,12 @@ export default function AdminViralisasi() {
 
   const removeRow = async () => {
     if (!deleteTarget) return;
-    const { error } = await deleteTikTok(deleteTarget.id);
+    const { error } = await deleteInstagram(deleteTarget.id);
     if (error) {
-      showToast('Gagal menghapus link TikTok', 'error');
+      showToast('Gagal menghapus link Instagram', 'error');
       return;
     }
-    showToast('Link TikTok berhasil dihapus', 'success');
+    showToast('Link Instagram berhasil dihapus', 'success');
     setDeleteTarget(null);
     load();
   };
@@ -45,7 +45,7 @@ export default function AdminViralisasi() {
       [
         { header: 'Kelompok', key: 'kelompok' },
         { header: 'Nama Pengirim', key: 'pengirim' },
-        { header: 'URL TikTok', key: 'url' },
+        { header: 'URL Instagram', key: 'url' },
         { header: 'Catatan', key: 'note' },
         { header: 'Tanggal', key: 'created_at' },
       ],
@@ -62,7 +62,7 @@ export default function AdminViralisasi() {
 
   return (
     <div>
-      <h2 className="admin-title">Video Viralisasi (TikTok)</h2>
+      <h2 className="admin-title">Link Instagram Viralisasi</h2>
 
       <div className="panel">
         <div className="panel-toolbar">
@@ -97,7 +97,7 @@ export default function AdminViralisasi() {
                 <tr>
                   <th>Kelompok</th>
                   <th>Nama Pengirim</th>
-                  <th>URL TikTok</th>
+                  <th>URL Instagram</th>
                   <th>Tanggal</th>
                   <th>Status</th>
                   <th>Aksi</th>
@@ -144,7 +144,7 @@ export default function AdminViralisasi() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Konfirmasi Hapus</h3>
             <p>
-              Apakah Anda yakin ingin menghapus link TikTok dari <strong>{deleteTarget.pengirim}</strong>?
+              Apakah Anda yakin ingin menghapus link Instagram dari <strong>{deleteTarget.pengirim}</strong>?
               <br />
               <span style={{ color: 'var(--danger)', fontWeight: 'bold' }}>Data yang dihapus tidak dapat dikembalikan.</span>
             </p>

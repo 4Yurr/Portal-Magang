@@ -49,7 +49,7 @@ export default function Dashboard() {
     { label: 'Absensi Sore', value: stats.absensiSore },
     { label: 'Total Absensi Seminar', value: stats.totalSeminar },
     { label: 'Total Laporan', value: stats.totalLaporan },
-    { label: 'Total Video Viralisasi', value: stats.totalTikTok },
+    { label: 'Total Link Instagram', value: stats.totalTikTok },
     { label: 'Total BPU', value: stats.totalBPU },
     { label: 'Total PU', value: stats.totalPU },
   ];

@@ -6,7 +6,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import {
   fetchAttendance,
   fetchSeminar,
-  fetchTikTok,
+  fetchInstagram,
   fetchReports,
   fetchAkuisisi,
   fetchParticipants,
@@ -89,14 +89,14 @@ export default function ExportData() {
       );
     });
 
-  const handleTikTok = () =>
-    run('tiktok', async () => {
-      const rows = await fetchTikTok();
+  const handleInstagram = () =>
+    run('instagram', async () => {
+      const rows = await fetchInstagram();
       return exportToExcel(
         [
           { header: 'Kelompok', key: 'kelompok' },
           { header: 'Nama Pengirim', key: 'pengirim' },
-          { header: 'URL TikTok', key: 'url' },
+          { header: 'URL Instagram', key: 'url' },
           { header: 'Tanggal', key: 'created_at' },
         ],
         rows.map((d) => ({
@@ -205,11 +205,11 @@ export default function ExportData() {
 
   const handleWorkbook = () =>
     run('workbook', async () => {
-      const [attendance, seminar, participants, tiktok, reports, bpu, pu] = await Promise.all([
+      const [attendance, seminar, participants, instagram, reports, bpu, pu] = await Promise.all([
         fetchAttendance(),
         fetchSeminar(),
         fetchParticipants({ pageSize: 100000 }),
-        fetchTikTok(),
+        fetchInstagram(),
         fetchReports(),
         fetchAkuisisi('akuisisi_bpu'),
         fetchAkuisisi('akuisisi_pu'),
@@ -374,7 +374,7 @@ export default function ExportData() {
               { header: 'URL', key: 'url' },
               { header: 'Created At', key: 'created_at' },
             ],
-            rows: tiktok.map((d) => ({
+            rows: instagram.map((d) => ({
               kelompok: d.kelompok,
               pengirim: d.pengirim,
               url: d.url,
@@ -449,7 +449,7 @@ export default function ExportData() {
     { key: 'workbook', label: 'Workbook Lengkap', desc: 'Portal_Magang_Export.xlsx', filename: 'Portal_Magang_Export.xlsx', onClick: handleWorkbook },
     { key: 'attendance', label: 'Data Absensi', desc: 'Absensi.xlsx', filename: 'Absensi.xlsx', onClick: handleAttendance },
     { key: 'seminar', label: 'Absensi Seminar', desc: 'Absensi_Seminar.xlsx', filename: 'Absensi_Seminar.xlsx', onClick: handleSeminar },
-    { key: 'tiktok', label: 'Video Viralisasi', desc: 'Video_Viralisasi.xlsx', filename: 'Video_Viralisasi.xlsx', onClick: handleTikTok },
+    { key: 'instagram', label: 'Link Instagram Viralisasi', desc: 'Video_Viralisasi.xlsx', filename: 'Video_Viralisasi.xlsx', onClick: handleInstagram },
     { key: 'reports', label: 'Laporan', desc: 'Laporan.xlsx', filename: 'Laporan.xlsx', onClick: handleReports },
     { key: 'bpu', label: 'Data BPU', desc: 'Data_BPU.xlsx', filename: 'Data_BPU.xlsx', onClick: handleBPU },
     { key: 'pu', label: 'Data PU', desc: 'Data_PU.xlsx', filename: 'Data_PU.xlsx', onClick: handlePU },

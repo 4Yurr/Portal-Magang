@@ -53,16 +53,14 @@ export function wibTimeString(date = serverWib()): string {
   return `${h}:${m}:${s}`;
 }
 
-// ---- TikTok URL validation ----
-const ALLOWED_TIKTOK_HOSTS = [
-  'tiktok.com',
-  'www.tiktok.com',
-  'vt.tiktok.com',
-  'vm.tiktok.com',
-  'm.tiktok.com',
+// ---- Instagram URL validation ----
+const ALLOWED_INSTAGRAM_HOSTS = [
+  'instagram.com',
+  'www.instagram.com',
+  'm.instagram.com',
 ];
 
-export function isValidTikTokUrl(value: string): boolean {
+export function isValidInstagramUrl(value: string): boolean {
   if (!value || typeof value !== 'string') return false;
   let trimmed = value.trim();
   if (!/^https?:\/\//i.test(trimmed)) {
@@ -72,11 +70,11 @@ export function isValidTikTokUrl(value: string): boolean {
     const parsed = new URL(trimmed);
     const host = parsed.hostname.toLowerCase();
     const hostOk =
-      ALLOWED_TIKTOK_HOSTS.includes(host) || host.endsWith('.tiktok.com');
+      ALLOWED_INSTAGRAM_HOSTS.includes(host) || host.endsWith('.instagram.com');
     const hasPath = parsed.pathname.length > 1;
     return hostOk && hasPath;
   } catch {
-    return /^(https?:\/\/)?([a-zA-Z0-9_-]+\.)?tiktok\.com\/[^\s]+$/i.test(trimmed);
+    return /^(https?:\/\/)?([a-zA-Z0-9_-]+\.)?instagram\.com\/[^\s]+$/i.test(trimmed);
   }
 }
 

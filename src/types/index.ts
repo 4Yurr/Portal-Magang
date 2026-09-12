@@ -66,7 +66,7 @@ export type ReportRow = {
   created_at: string;
 };
 
-export type TikTokRow = {
+export type InstagramRow = {
   id: string;
   kelompok: string;
   pengirim: string;
