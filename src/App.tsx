@@ -40,7 +40,32 @@ function RequireAuth({ children }: { children: JSX.Element }) {
   return children;
 }
 
+const MAINTENANCE_MODE = true;
+
+function MaintenancePage() {
+  return (
+    <main className="maintenance-screen">
+      <section className="maintenance-panel" aria-labelledby="maintenance-title">
+        <div className="maintenance-mark" aria-hidden="true">!</div>
+        <p className="maintenance-label">Portal Magang BPJS Ketenagakerjaan</p>
+        <h1 id="maintenance-title">Sedang Dalam Pemeliharaan</h1>
+        <p className="maintenance-message">
+          Kami sedang melakukan pemeliharaan sistem. Silakan coba kembali beberapa saat lagi.
+        </p>
+        <div className="maintenance-status">
+          <span className="maintenance-status-dot" aria-hidden="true" />
+          Layanan sementara tidak tersedia
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export default function App() {
+  if (MAINTENANCE_MODE) {
+    return <MaintenancePage />;
+  }
+
   return (
     <BrowserRouter>
       <Routes>
