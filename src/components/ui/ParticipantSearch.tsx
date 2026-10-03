@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useParticipantSearch } from '../../hooks/useParticipantSearch';
+import { AppIcon } from './AppIcon';
 import { Spinner } from './Spinner';
 
 type Props = {
@@ -37,7 +38,7 @@ export function ParticipantSearch({ onSelect, placeholder, clearKey }: Props) {
   return (
     <div className="searchable-select">
       <div className="search-input-box">
-        <span className="search-icon">🔍</span>
+        <AppIcon name="search" className="search-icon" size={15} />
         <input
           ref={inputRef}
           type="text"
@@ -56,8 +57,8 @@ export function ParticipantSearch({ onSelect, placeholder, clearKey }: Props) {
         />
         {loading && <Spinner size={16} />}
         {selected && (
-          <button type="button" className="btn-clear-search" onClick={handleClear} title="Hapus">
-            ✕
+          <button type="button" className="btn-clear-search" onClick={handleClear} title="Hapus" aria-label="Hapus pencarian">
+            <AppIcon name="clear" size={14} />
           </button>
         )}
       </div>

@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
-import { uploadFile, uploadAkuisisiFileToDrive } from '../../services/participantService';
+import { AppIcon } from '../../components/ui/AppIcon';
+import { uploadAkuisisiFileToDrive } from '../../services/participantService';
 import { isValidNIK, isValidPdf, MAX_REPORT_SIZE } from '../../utils/constants';
 
 const KELOMPOK = Array.from({ length: 10 }, (_, i) => String(i + 1));
@@ -16,8 +17,6 @@ type Props = {
 export function AkuisisiForm({ type }: Props) {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const bucket = type === 'BPU' ? 'bpu' : 'pu';
-
   const [kelompok, setKelompok] = useState('');
   const [namaKtp, setNamaKtp] = useState('');
   const [nik, setNik] = useState('');
@@ -54,15 +53,6 @@ export function AkuisisiForm({ type }: Props) {
 
     setSubmitting(true);
     try {
-      const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'pdf') ?? 'pdf';
-      const filename = `${type}_${kelompok}_${Date.now()}.${ext}`;
-      const up = await uploadFile(bucket, filename, file);
-      if (!up.path) {
-        showToast('Gagal mengunggah file: ' + (up.error ?? 'unknown'), 'error');
-        setSubmitting(false);
-        return;
-      }
-
       const driveUp = await uploadAkuisisiFileToDrive({
           id: crypto.randomUUID(),
           kelompok,
@@ -72,7 +62,6 @@ export function AkuisisiForm({ type }: Props) {
           namaKtp: namaKtp.trim(),
           nik: nik.trim(),
           jenisKelamin: jenisKelamin as 'Laki-laki' | 'Perempuan',
-          storagePath: `${bucket}/${filename}`,
         });
 
       if (!driveUp.ok) {
@@ -104,7 +93,7 @@ export function AkuisisiForm({ type }: Props) {
         </div>
 
         <div className="info-banner">
-          <span>{type === 'BPU' ? '👥' : '🏢'}</span>
+          <AppIcon name={type === 'BPU' ? 'users' : 'briefcase'} size={18} />
           <div>
             <strong>{type === 'BPU' ? 'Bukan Penerima Upah (BPU)' : 'Penerima Upah (PU)'}</strong>
             <br />
@@ -154,7 +143,7 @@ export function AkuisisiForm({ type }: Props) {
 
           <label>Scan Formulir dan KTP Jadikan Satu PDF ({type}) *</label>
           <div className="file-dropzone" onClick={() => document.getElementById('akuisisi-file')?.click()}>
-            <span className="dropzone-icon">📄</span>
+            <AppIcon name="report" className="dropzone-icon" size={30} />
             <div className="dropzone-label">Pilih Satu File PDF {type}</div>
             <div className="dropzone-sub">Gabungkan scan formulir dan KTP menjadi satu PDF (maks 10 MB)</div>
             <input
@@ -164,7 +153,7 @@ export function AkuisisiForm({ type }: Props) {
               style={{ display: 'none' }}
               onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
             />
-            {fileLabel && <div className="file-name-preview">📎 {fileLabel}</div>}
+            {fileLabel && <div className="file-name-preview"><AppIcon name="upload" size={14} /> {fileLabel}</div>}
           </div>
           {fileError && (
             <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: 8 }}>{fileError}</p>

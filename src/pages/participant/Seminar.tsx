@@ -5,8 +5,9 @@ import { useParticipantSearch } from '../../hooks/useParticipantSearch';
 import { LocationPicker } from '../../components/participant/LocationPicker';
 import { ParticipantSearch } from '../../components/ui/ParticipantSearch';
 import { Spinner } from '../../components/ui/Spinner';
+import { AppIcon } from '../../components/ui/AppIcon';
 import type { GeoLocation } from '../../types';
-import { getServerWib, submitSeminar, uploadFile } from '../../services/participantService';
+import { getServerWib, submitSeminar, uploadAttendancePhoto } from '../../services/participantService';
 import { wibDateString, wibTimeString, isValidPhoto } from '../../utils/constants';
 
 export default function Seminar() {
@@ -51,9 +52,15 @@ export default function Seminar() {
       const fileExtension = photo.name.includes('.') ? photo.name.split('.').pop()?.toLowerCase() : 'jpg';
       const userId = selected.nim.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
       const newFileName = `${userId}_seminar_${new Date().toISOString().split('T')[0]}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension || 'jpg'}`;
-      const renamedPhoto = new File([photo], newFileName, { type: photo.type });
-      const photoUp = await uploadFile('attendance-photos', newFileName, renamedPhoto);
-      if (!photoUp.path) {
+      const photoUp = await uploadAttendancePhoto({
+        nim: selected.nim,
+        tanggal: wibDateString(now),
+        kegiatan: kegiatan.trim(),
+        jenis: 'seminar',
+        filename: newFileName,
+        file: photo,
+      });
+      if (!photoUp.url) {
         showToast(`Foto seminar gagal diunggah. Absensi belum disimpan: ${photoUp.error ?? 'unknown'}`, 'error');
         return;
       }
@@ -66,13 +73,8 @@ export default function Seminar() {
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
-        file: {
-          bucket: 'attendance-photos',
-          path: photoUp.path,
-          filename: newFileName,
-          mimeType: renamedPhoto.type || 'image/jpeg',
-          size: renamedPhoto.size,
-        },
+        photoUrl: photoUp.url,
+        photoFilename: newFileName,
       });
 
       showToast(res.message, res.success ? 'success' : 'error');
@@ -103,7 +105,7 @@ export default function Seminar() {
         </div>
 
         <div className="info-banner">
-          <span>🎓</span>
+          <AppIcon name="seminar" size={18} />
           <div>
             <strong>Kehadiran Seminar / Webinar Magang</strong>
             <br />
@@ -148,7 +150,7 @@ export default function Seminar() {
           <legend>4. Foto Kegiatan</legend>
           <label>Foto Selfie di Lokasi Seminar *</label>
           <label className="file-dropzone" htmlFor="seminar-photo">
-            <span className="dropzone-icon">📷</span>
+            <AppIcon name="camera" className="dropzone-icon" size={30} />
             <div className="dropzone-label">Ambil Foto / Pilih Gambar</div>
             <div className="dropzone-sub">Foto selfie jelas di lokasi seminar</div>
             <input

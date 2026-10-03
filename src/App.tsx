@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ParticipantLayout } from './layouts/ParticipantLayout';
 import { AdminLayout } from './layouts/AdminLayout';
 import { useAuth } from './hooks/useAuth';
@@ -8,9 +9,8 @@ import Absensi from './pages/participant/Absensi';
 import Seminar from './pages/participant/Seminar';
 import Viralisasi from './pages/participant/Viralisasi';
 import Laporan from './pages/participant/Laporan';
-import AkuisisiBPU from './pages/participant/AkuisisiBPU';
-import AkuisisiPU from './pages/participant/AkuisisiPU';
 import Materi from './pages/participant/Materi';
+import PengumumanPeserta from './pages/participant/Pengumuman';
 import Login from './pages/admin/Login';
 import Dashboard from './pages/admin/Dashboard';
 import Peserta from './pages/admin/Peserta';
@@ -19,11 +19,10 @@ import AdminRekapAbsensi from './pages/admin/AdminRekapAbsensi';
 import AdminSeminar from './pages/admin/AdminSeminar';
 import AdminViralisasi from './pages/admin/AdminViralisasi';
 import AdminLaporan from './pages/admin/AdminLaporan';
-import AdminBPU from './pages/admin/AdminBPU';
-import AdminPU from './pages/admin/AdminPU';
 import AdminMateri from './pages/admin/AdminMateri';
 import ExportData from './pages/admin/ExportData';
 import Pengaturan from './pages/admin/Pengaturan';
+import AdminPengumuman from './pages/admin/AdminPengumuman';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { isAuthenticated, loading } = useAuth();
@@ -40,34 +39,43 @@ function RequireAuth({ children }: { children: JSX.Element }) {
   return children;
 }
 
-const MAINTENANCE_MODE = true;
+function RouteTitle() {
+  const location = useLocation();
 
-function MaintenancePage() {
-  return (
-    <main className="maintenance-screen">
-      <section className="maintenance-panel" aria-labelledby="maintenance-title">
-        <div className="maintenance-mark" aria-hidden="true">!</div>
-        <p className="maintenance-label">Portal Magang BPJS Ketenagakerjaan</p>
-        <h1 id="maintenance-title">Sedang Dalam Pemeliharaan</h1>
-        <p className="maintenance-message">
-          Kami sedang melakukan pemeliharaan sistem. Silakan coba kembali beberapa saat lagi.
-        </p>
-        <div className="maintenance-status">
-          <span className="maintenance-status-dot" aria-hidden="true" />
-          Layanan sementara tidak tersedia
-        </div>
-      </section>
-    </main>
-  );
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      '/': 'Dashboard | Portal Magang BPJS Ketenagakerjaan',
+      '/absensi': 'Absensi | Portal Magang BPJS Ketenagakerjaan',
+      '/seminar': 'Absensi Seminar | Portal Magang BPJS Ketenagakerjaan',
+      '/viralisasi': 'Video Viralisasi | Portal Magang BPJS Ketenagakerjaan',
+      '/laporan': 'Upload Laporan | Portal Magang BPJS Ketenagakerjaan',
+      '/materi': 'Materi & Formulir | Portal Magang BPJS Ketenagakerjaan',
+      '/pengumuman': 'Pengumuman | Portal Magang BPJS Ketenagakerjaan',
+      '/login': 'Login | Portal Magang BPJS Ketenagakerjaan',
+      '/admin': 'Dashboard Admin | Portal Magang BPJS Ketenagakerjaan',
+      '/admin/peserta': 'Peserta | Portal Magang BPJS Ketenagakerjaan',
+      '/admin/absensi': 'Log Absensi | Portal Magang BPJS Ketenagakerjaan',
+      '/admin/absensi-biasa': 'Rekap Absensi Biasa | Portal Magang BPJS Ketenagakerjaan',
+      '/admin/seminar': 'Absensi Seminar Admin | Portal Magang BPJS Ketenagakerjaan',
+      '/admin/viralisasi': 'Video Viralisasi Admin | Portal Magang BPJS Ketenagakerjaan',
+      '/admin/laporan': 'Laporan Admin | Portal Magang BPJS Ketenagakerjaan',
+      '/admin/materi': 'Materi PDF Admin | Portal Magang BPJS Ketenagakerjaan',
+      '/admin/pengaturan': 'Pengaturan | Portal Magang BPJS Ketenagakerjaan',
+      '/admin/pengumuman': 'Pengumuman Admin | Portal Magang BPJS Ketenagakerjaan',
+      '/admin/export': 'Export Data | Portal Magang BPJS Ketenagakerjaan',
+    };
+
+    const match = Object.keys(titles).find((key) => location.pathname === key || location.pathname.startsWith(`${key}/`));
+    document.title = match ? titles[match] : 'Portal Magang BPJS Ketenagakerjaan';
+  }, [location.pathname]);
+
+  return null;
 }
 
 export default function App() {
-  if (MAINTENANCE_MODE) {
-    return <MaintenancePage />;
-  }
-
   return (
     <BrowserRouter>
+      <RouteTitle />
       <Routes>
         {/* Portal Peserta */}
         <Route element={<ParticipantLayout />}>
@@ -76,9 +84,8 @@ export default function App() {
           <Route path="/seminar" element={<Seminar />} />
           <Route path="/viralisasi" element={<Viralisasi />} />
           <Route path="/laporan" element={<Laporan />} />
-          <Route path="/bpu" element={<AkuisisiBPU />} />
-          <Route path="/pu" element={<AkuisisiPU />} />
           <Route path="/materi" element={<Materi />} />
+          <Route path="/pengumuman" element={<PengumumanPeserta />} />
         </Route>
 
         {/* Admin */}
@@ -98,11 +105,10 @@ export default function App() {
           <Route path="seminar" element={<AdminSeminar />} />
           <Route path="viralisasi" element={<AdminViralisasi />} />
           <Route path="laporan" element={<AdminLaporan />} />
-          <Route path="bpu" element={<AdminBPU />} />
-          <Route path="pu" element={<AdminPU />} />
           <Route path="materi" element={<AdminMateri />} />
           <Route path="export" element={<ExportData />} />
           <Route path="pengaturan" element={<Pengaturan />} />
+          <Route path="pengumuman" element={<AdminPengumuman />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

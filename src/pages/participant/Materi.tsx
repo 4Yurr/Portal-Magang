@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AppIcon } from '../../components/ui/AppIcon';
 import { MaterialRow } from '../../types';
 import { getMaterials, materialPublicUrl } from '../../services/participantService';
 
@@ -83,7 +84,7 @@ export default function Materi() {
         </div>
 
         <div className="info-banner">
-          <span>📚</span>
+          <AppIcon name="material" size={18} />
           <div>
             <strong>Download Materi & Formulir</strong>
             <br />
@@ -98,7 +99,7 @@ export default function Materi() {
         {materials.map((m) => (
           <div key={m.id} className="download-banner">
             <div className="download-info">
-              <span className="download-icon">📥</span>
+              <AppIcon name="download" size={18} className="download-icon" />
               <div>
                 <strong>{m.title}</strong>
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{m.description}</div>

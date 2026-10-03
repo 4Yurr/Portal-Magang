@@ -1,16 +1,8 @@
 // Constants & validation helpers shared across the app.
 
-// Absensi window (Asia/Jakarta)
 export const TIMEZONE = 'Asia/Jakarta';
 
-export const SESSION_CONFIG = {
-  PAGI: { start: '08:00:00', end: '09:30:00', label: 'Pagi', short: 'PAGI' },
-  SORE: { start: '15:30:00', end: '17:00:00', label: 'Sore', short: 'SORE' },
-} as const;
-
-export type SessionKey = keyof typeof SESSION_CONFIG;
-
-export function evalSessionWindowByConfig(nowWib: Date, start: string, end: string) {
+export function evalTimeWindowByConfig(nowWib: Date, start: string, end: string) {
   const time = nowWib.getHours() * 3600 + nowWib.getMinutes() * 60 + nowWib.getSeconds();
   const [sh, sm, ss] = start.split(':').map(Number);
   const [eh, em, es] = end.split(':').map(Number);
@@ -23,18 +15,9 @@ export function evalSessionWindowByConfig(nowWib: Date, start: string, end: stri
   };
 }
 
-export function evalSessionWindow(nowWib: Date, sessionKey: SessionKey) {
-  const cfg = SESSION_CONFIG[sessionKey];
-  return evalSessionWindowByConfig(nowWib, cfg.start, cfg.end);
-}
-
 // Waktu server (dari Supabase) dalam zona Asia/Jakarta sebagai Date
 export function serverWib(): Date {
   return new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
-}
-
-export function isSessionOpen(sessionKey: SessionKey): boolean {
-  return evalSessionWindow(serverWib(), sessionKey).isOpen;
 }
 
 // Format tanggal WIB -> YYYY-MM-DD
@@ -82,8 +65,6 @@ export function isValidInstagramUrl(value: string): boolean {
 export function isValidNIK(nik: string): boolean {
   return /^\d{16}$/.test(String(nik).trim());
 }
-
-export type attendance_session = 'PAGI' | 'SORE';
 
 // Formatting helpers
 export function formatDateTime(value: string | null | undefined): string {

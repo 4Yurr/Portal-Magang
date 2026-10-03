@@ -2,6 +2,7 @@
 
 import { supabase } from '../lib/supabaseClient';
 import type {
+  AttendanceWindow,
   AttendanceRow,
   SeminarRow,
   ReportRow,
@@ -9,6 +10,7 @@ import type {
   AkuisisiRow,
   Participant,
   MaterialRow,
+  AnnouncementRow,
 } from '../types';
 
 // ============================================================================
@@ -36,36 +38,26 @@ export async function fetchDashboardStats() {
     nowWib.getDate(),
   ).padStart(2, '0')}`;
 
-  const [participants, attendanceToday, seminarCount, reportCount, tiktokCount, bpuCount, puCount] =
+  const [participants, attendanceToday, seminarCount, reportCount, tiktokCount] =
     await Promise.all([
       supabase.from('participants').select('nim', { count: 'exact', head: true }),
-      supabase.from('attendance').select('id, session', { count: 'exact' }).eq('tanggal', today),
+      supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('tanggal', today),
       supabase.from('seminar_attendance').select('id', { count: 'exact', head: true }),
       supabase.from('reports').select('id', { count: 'exact', head: true }),
       supabase.from('tiktok_submissions').select('id', { count: 'exact', head: true }),
-      supabase.from('akuisisi_bpu').select('id', { count: 'exact', head: true }),
-      supabase.from('akuisisi_pu').select('id', { count: 'exact', head: true }),
     ]);
-
-  const attendanceRows = attendanceToday.data ?? [];
-  const pagi = attendanceRows.filter((r) => r.session === 'PAGI').length;
-  const sore = attendanceRows.filter((r) => r.session === 'SORE').length;
 
   return {
     totalParticipants: participants.count ?? 0,
-    totalHadirHariIni: attendanceRows.length,
-    absensiPagi: pagi,
-    absensiSore: sore,
+    totalHadirHariIni: attendanceToday.count ?? 0,
     totalSeminar: seminarCount.count ?? 0,
     totalLaporan: reportCount.count ?? 0,
     totalTikTok: tiktokCount.count ?? 0,
-    totalBPU: bpuCount.count ?? 0,
-    totalPU: puCount.count ?? 0,
   };
 }
 
 export async function fetchRecentActivities() {
-  const [attendance, reports, bpu, pu] = await Promise.all([
+  const [attendance, reports] = await Promise.all([
     supabase
       .from('v_attendance')
       .select('*')
@@ -76,14 +68,10 @@ export async function fetchRecentActivities() {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(5),
-    supabase.from('akuisisi_bpu').select('*').order('created_at', { ascending: false }).limit(5),
-    supabase.from('akuisisi_pu').select('*').order('created_at', { ascending: false }).limit(5),
   ]);
   return {
     attendance: attendance.data ?? [],
     reports: reports.data ?? [],
-    bpu: bpu.data ?? [],
-    pu: pu.data ?? [],
   };
 }
 
@@ -111,10 +99,22 @@ export async function fetchParticipants(opts: {
   q = q.order('nim', { ascending: true });
   if (opts.page && opts.pageSize) {
     q = q.range((opts.page - 1) * opts.pageSize, opts.page * opts.pageSize - 1);
+    const { data, count, error } = await q;
+    if (error) return { data: [], total: 0 };
+    return { data: (data as Participant[]) ?? [], total: count ?? 0 };
   }
-  const { data, count, error } = await q;
-  if (error) return { data: [], total: 0 };
-  return { data: (data as Participant[]) ?? [], total: count ?? 0 };
+
+  const data: Participant[] = [];
+  const pageSize = 1000;
+  let total = 0;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data: pageData, count, error } = await q.range(offset, offset + pageSize - 1);
+    if (error) return { data: [], total: 0 };
+    data.push(...((pageData ?? []) as Participant[]));
+    total = count ?? total;
+    if (!pageData || pageData.length < pageSize) break;
+  }
+  return { data, total };
 }
 
 export async function upsertParticipant(p: {
@@ -148,25 +148,33 @@ export async function hardDeleteParticipant(nim: string) {
 // ============================================================================
 export async function fetchAttendance(opts?: {
   date?: string;
-  session?: string;
+  startDate?: string;
+  endDateExclusive?: string;
   search?: string;
   kelompok?: string;
 }): Promise<AttendanceRow[]> {
   let q = supabase.from('v_attendance').select('*');
   if (opts?.date) q = q.eq('tanggal', opts.date);
-  if (opts?.session) q = q.eq('session', opts.session);
+  if (opts?.startDate) q = q.gte('tanggal', opts.startDate);
+  if (opts?.endDateExclusive) q = q.lt('tanggal', opts.endDateExclusive);
   if (opts?.kelompok) q = q.eq('kelompok', opts.kelompok);
   if (opts?.search) {
     const s = opts.search.trim();
     q = q.or(`nim.ilike.%${s}%,nama.ilike.%${s}%`);
   }
   q = q.order('created_at', { ascending: false });
-  const { data, error } = await q;
-  if (error) {
-    console.error('fetchAttendance error:', error);
-    return [];
+  const rows: AttendanceRow[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await q.range(offset, offset + pageSize - 1);
+    if (error) {
+      console.error('fetchAttendance error:', error);
+      return [];
+    }
+    rows.push(...((data ?? []) as AttendanceRow[]));
+    if (!data || data.length < pageSize) break;
   }
-  return (data ?? []) as AttendanceRow[];
+  return rows;
 }
 
 export async function fetchSeminar(opts?: {
@@ -241,48 +249,107 @@ export async function fetchMaterials(): Promise<MaterialRow[]> {
   return (data ?? []) as MaterialRow[];
 }
 
-export type AttendanceSetting = {
-  id: string;
-  session: 'PAGI' | 'SORE';
-  start_time: string;
-  end_time: string;
-  active_date_start: string | null;
-  active_date_end: string | null;
-  is_active: boolean;
-  updated_at: string;
-};
 
-export async function fetchAttendanceSettings(): Promise<AttendanceSetting[]> {
-  const { data, error } = await supabase
-    .from('attendance_settings')
-    .select('*')
-    .order('session', { ascending: true });
+export async function fetchAnnouncements(publishedOnly = false): Promise<AnnouncementRow[]> {
+  let query = supabase.from('announcements').select('*').order('created_at', { ascending: false });
+  if (publishedOnly) query = query.eq('is_published', true);
+  const { data, error } = await query;
   if (error) {
-    console.error('fetchAttendanceSettings error:', error);
+    console.error('fetchAnnouncements error:', error);
     return [];
   }
-  return (data ?? []) as AttendanceSetting[];
+  return (data ?? []) as AnnouncementRow[];
+}
+
+export async function createAnnouncement(payload: {
+  title: string;
+  content: string;
+  image_file_id: string | null;
+  image_filename: string | null;
+  attachment_file_id: string | null;
+  attachment_filename: string | null;
+  attachment_mime_type: string | null;
+  is_published: boolean;
+}) {
+  return supabase.from('announcements').insert(payload).select().single();
+}
+
+export async function updateAnnouncement(id: string, payload: {
+  title: string;
+  content: string;
+  image_file_id: string | null;
+  image_filename: string | null;
+  attachment_file_id: string | null;
+  attachment_filename: string | null;
+  attachment_mime_type: string | null;
+  is_published: boolean;
+}) {
+  return supabase.from('announcements').update(payload).eq('id', id);
+}
+
+export async function deleteAnnouncement(id: string) {
+  return supabase.from('announcements').delete().eq('id', id);
+}
+
+export async function uploadAnnouncementAsset(file: File, asset: 'image' | 'file'): Promise<{ fileId: string | null; error: string | null }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!session?.access_token || !supabaseUrl || !anonKey) {
+    return { fileId: null, error: 'Sesi admin atau konfigurasi Supabase tidak tersedia.' };
+  }
+
+  try {
+    const query = new URLSearchParams({
+      jenis: 'announcement-asset',
+      asset,
+      filename: file.name,
+      type: file.type || 'application/octet-stream',
+    });
+    const response = await fetch(`${supabaseUrl}/functions/v1/upload-attendance?${query}`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': file.type || 'application/octet-stream',
+      },
+      body: file,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || typeof data.fileId !== 'string') {
+      return { fileId: null, error: String(data.error || `HTTP ${response.status}`) };
+    }
+    return { fileId: data.fileId, error: null };
+  } catch (error) {
+    return { fileId: null, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export function announcementAssetUrl(announcementId: string, asset: 'image' | 'file', download = false): string {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const query = new URLSearchParams({ announcementId, asset, apikey: anonKey || '' });
+  if (download) query.set('download', '1');
+  return `${supabaseUrl}/functions/v1/upload-attendance?${query}`;
+}
+export async function fetchAttendanceSettings(): Promise<AttendanceWindow | null> {
+  const { data, error } = await supabase
+    .from('daily_attendance_window')
+    .select('*')
+    .eq('id', true)
+    .maybeSingle();
+  if (error) {
+    console.error('fetchAttendanceSettings error:', error);
+    return null;
+  }
+  return data as AttendanceWindow | null;
 }
 
 export async function upsertAttendanceSetting(payload: {
-  session: 'PAGI' | 'SORE';
-  start_time: string;
-  end_time: string;
-  active_date_start: string | null;
-  active_date_end: string | null;
-  is_active: boolean;
+  open_time: string;
+  close_time: string;
 }) {
-  return supabase.from('attendance_settings').upsert(
-    {
-      session: payload.session,
-      start_time: payload.start_time,
-      end_time: payload.end_time,
-      active_date_start: payload.active_date_start,
-      active_date_end: payload.active_date_end,
-      is_active: payload.is_active,
-    },
-    { onConflict: 'session' },
-  );
+  return supabase.from('daily_attendance_window').update(payload).eq('id', true);
 }
 
 export async function fetchAuditLogs(limit = 20): Promise<any[]> {
@@ -320,21 +387,13 @@ export async function updateAttendanceStatus(id: string, status: 'Hadir' | 'Izin
   return res;
 }
 
-export async function updateAttendance(id: string, updates: { tanggal?: string; jam?: string; status?: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak'; session?: 'PAGI' | 'SORE' }) {
-  const { data: beforeData } = await supabase.from('attendance').select('*').eq('id', id).single();
-  const res = await supabase.from('attendance').update(updates).eq('id', id).select().single();
-  if (!res.error && beforeData) {
-    await writeAuditLog('attendance', id, 'UPDATE', beforeData, res.data);
-  }
-  return res;
-}
-
 export async function deleteAttendance(id: string) {
   const { data: beforeData } = await supabase.from('attendance').select('*').eq('id', id).single();
-  if (beforeData) {
+  const res = await supabase.from('attendance').delete().eq('id', id);
+  if (!res.error && beforeData) {
     await writeAuditLog('attendance', id, 'DELETE', beforeData, null);
   }
-  return supabase.from('attendance').delete().eq('id', id);
+  return res;
 }
 
 export async function updateSeminarStatus(id: string, status: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak') {
@@ -367,7 +426,7 @@ export async function deleteAkuisisi(table: 'akuisisi_bpu' | 'akuisisi_pu', id: 
   const { data: beforeData } = await supabase.from(table).select('*').eq('id', id).single();
   if (beforeData) {
     await writeAuditLog(table, id, 'DELETE', beforeData, null);
-    if (beforeData.storage_path) {
+    if (beforeData.storage_path && !/^https?:\/\//i.test(beforeData.storage_path)) {
       const idx = beforeData.storage_path.indexOf('/');
       const bucket = beforeData.storage_path.slice(0, idx);
       const path = beforeData.storage_path.slice(idx + 1);
@@ -394,7 +453,7 @@ export async function deleteReport(id: string) {
   const { data: beforeData } = await supabase.from('reports').select('*').eq('id', id).single();
   if (beforeData) {
     await writeAuditLog('reports', id, 'DELETE', beforeData, null);
-    if (beforeData.storage_path) {
+    if (beforeData.storage_path && !/^https?:\/\//i.test(beforeData.storage_path)) {
       const idx = beforeData.storage_path.indexOf('/');
       const bucket = beforeData.storage_path.slice(0, idx);
       const path = beforeData.storage_path.slice(idx + 1);

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
+import { AppIcon } from '../../components/ui/AppIcon';
 import { supabase } from '../../lib/supabaseClient';
 import { getPublicMaterialUrl } from '../../services/adminService';
 import type { MaterialRow } from '../../types';
@@ -67,7 +68,7 @@ export default function AdminMateri() {
       <h2 className="admin-title">Materi PDF</h2>
 
       <div className="info-banner" style={{ marginBottom: 16 }}>
-        <span>📚</span>
+        <AppIcon name="material" size={18} />
         <div>
           <strong>Cara unggah file materi (BPU.pdf / PU.pdf):</strong>
           <br />

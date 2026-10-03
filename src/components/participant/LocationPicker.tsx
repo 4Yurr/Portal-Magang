@@ -1,6 +1,7 @@
 // Location picker using browser Geolocation API. No radius/distance validation.
 
 import { useEffect } from 'react';
+import { AppIcon } from '../ui/AppIcon';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import type { GeoLocation } from '../../types';
 
@@ -31,13 +32,14 @@ export function LocationPicker({ onLocationChange }: Props) {
         }}
         disabled={locating}
       >
-        {locating ? 'Mengambil lokasi...' : location ? '📍 Lokasi Diambil (Hapus)' : '📍 Ambil Lokasi Saya'}
+        <AppIcon name="pin" size={16} />
+        {locating ? 'Mengambil lokasi...' : location ? 'Lokasi Diambil (Hapus)' : 'Ambil Lokasi Saya'}
       </button>
 
       {location && (
         <div style={{ marginTop: 10 }}>
           <p className="location-status success">
-            ✅ Lat: {location.latitude.toFixed(5)} | Lon: {location.longitude.toFixed(5)} | Akurasi ±
+            <AppIcon name="check" size={14} /> Lat: {location.latitude.toFixed(5)} | Lon: {location.longitude.toFixed(5)} | Akurasi ±
             {Math.round(location.accuracy)} m
           </p>
           <a
@@ -47,7 +49,7 @@ export function LocationPicker({ onLocationChange }: Props) {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Buka Google Maps ↗
+            <AppIcon name="arrowUpRight" size={14} /> Buka Google Maps
           </a>
         </div>
       )}

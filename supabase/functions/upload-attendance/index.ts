@@ -7,8 +7,8 @@ function getFolderIdForJenis(jenis: string): string {
   const map: Record<string, string | undefined> = {
     biasa: Deno.env.get('GDRIVE_FOLDER_ID_ABSENSI'),
     seminar: Deno.env.get('GDRIVE_FOLDER_ID_SEMINAR'),
-    bpu: Deno.env.get('GDRIVE_FOLDER_ID_BPU') || '1z9wb119pfxlUMkd_5HEisTeXt9XPIO42',
-    pu: Deno.env.get('GDRIVE_FOLDER_ID_PU') || '1GNZTZ4FKoiln3n62vhlZrmGf_AcCCAs8',
+    laporan: Deno.env.get('GDRIVE_FOLDER_ID_REPORTS'),
+    'announcement-asset': Deno.env.get('GDRIVE_FOLDER_ID_ANNOUNCEMENTS'),
   }
   const folder = map[jenis]
   return folder || Deno.env.get('GDRIVE_FOLDER_ID') || '1jAAVWzLXH15OIct6ZUqxlpKJzs1VYokl'
@@ -34,7 +34,7 @@ function resolveContentType(typeFromQuery: string, ext: string): string {
   if (ext === 'heic') return 'image/heic'
   if (ext === 'heif') return 'image/heif'
   if (ext === 'pdf') return 'application/pdf'
-  return 'image/jpeg'
+  return t || 'application/octet-stream'
 }
 
 function resolveFileExtension(filename: string, contentType: string): string {
@@ -117,7 +117,7 @@ async function uploadToDrive(folderId: string, accessToken: string, filename: st
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
 serve(async (req) => {
@@ -129,6 +129,13 @@ serve(async (req) => {
   }
 
   try {
+    if (req.method === 'GET') {
+      if (new URL(req.url).searchParams.has('announcementId')) {
+        return await serveAnnouncementAsset(req)
+      }
+      return await serveAdminPhoto(req)
+    }
+
     if (req.method !== 'POST') {
       return json({ ok: false, error: 'Method not allowed' }, CORS_HEADERS, 405)
     }
@@ -136,16 +143,18 @@ serve(async (req) => {
     const url = new URL(req.url)
     const participantId = url.searchParams.get('nim') || ''
     const tanggal = url.searchParams.get('tanggal') || ''
-    const session = url.searchParams.get('session') || ''
     const originalFilename = url.searchParams.get('filename') || 'photo.jpg'
     const jenis = url.searchParams.get('jenis') || 'biasa'
+    const asset = url.searchParams.get('asset') || ''
+    if (jenis === 'bpu' || jenis === 'pu') {
+      return json({ ok: false, error: 'BPU/PU acquisition uploads are no longer available' }, CORS_HEADERS, 410)
+    }
     const kegiatan = url.searchParams.get('kegiatan') || ''
     const id = url.searchParams.get('id') || ''
     const kelompok = url.searchParams.get('kelompok') || ''
     const namaKtp = url.searchParams.get('nama_ktp') || ''
     const nik = url.searchParams.get('nik') || ''
     const jenisKelamin = url.searchParams.get('jenis_kelamin') || ''
-    const storagePath = url.searchParams.get('storage_path') || ''
     const sizeBytes = Number(url.searchParams.get('size_bytes') || '0')
 
     if ((jenis === 'biasa' || jenis === 'seminar') && (!participantId || !tanggal)) {
@@ -154,23 +163,46 @@ serve(async (req) => {
     if (jenis === 'seminar' && !kegiatan) {
       return json({ ok: false, error: 'Missing kegiatan for seminar' }, CORS_HEADERS, 400)
     }
+    if (jenis === 'laporan' && (!participantId || !originalFilename.toLowerCase().endsWith('.pdf'))) {
+      return json({ ok: false, error: 'Missing NIM or invalid report filename' }, CORS_HEADERS, 400)
+    }
     if ((jenis === 'bpu' || jenis === 'pu') && !id) {
       return json({ ok: false, error: 'Missing record id for BPU/PU' }, CORS_HEADERS, 400)
     }
-    if ((jenis === 'bpu' || jenis === 'pu') && (!kelompok || !namaKtp || !/^\d{16}$/.test(nik) || !storagePath || !['Laki-laki', 'Perempuan'].includes(jenisKelamin))) {
+    if ((jenis === 'bpu' || jenis === 'pu') && (!kelompok || !namaKtp || !/^\d{16}$/.test(nik) || !['Laki-laki', 'Perempuan'].includes(jenisKelamin))) {
       return json({ ok: false, error: 'Missing or invalid BPU/PU participant data' }, CORS_HEADERS, 400)
+    }
+    if (jenis === 'announcement-asset') {
+      const token = req.headers.get('Authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
+      if (!token || !supabaseUrl || !anonKey) {
+        return json({ ok: false, error: 'Admin authentication is required' }, CORS_HEADERS, 401)
+      }
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      })
+      const { data: isAdmin, error: authError } = await userClient.rpc('is_admin')
+      if (authError || !isAdmin) {
+        return json({ ok: false, error: 'Admin access required' }, CORS_HEADERS, 403)
+      }
+      if (!['image', 'file'].includes(asset) || !originalFilename.trim()) {
+        return json({ ok: false, error: 'Missing asset type or filename' }, CORS_HEADERS, 400)
+      }
     }
 
     const blob = await req.blob()
     if (blob.size <= 0) {
       return json({ ok: false, error: 'Empty file' }, CORS_HEADERS, 400)
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-    const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-    const adminClient = createClient(supabaseUrl, serviceRole)
+    if (jenis === 'announcement-asset' && blob.size > 25 * 1024 * 1024) {
+      return json({ ok: false, error: 'Announcement files are limited to 25 MB' }, CORS_HEADERS, 413)
+    }
 
     const typeFromQuery = url.searchParams.get('type') || ''
+    if (jenis === 'announcement-asset' && asset === 'image' && !typeFromQuery.startsWith('image/')) {
+      return json({ ok: false, error: 'Announcement image must be an image file' }, CORS_HEADERS, 415)
+    }
     const ext = originalFilename.includes('.') ? originalFilename.split('.').pop()!.toLowerCase() : ''
     const contentType = resolveContentType(typeFromQuery, ext)
     const safeExt = resolveFileExtension(originalFilename, contentType)
@@ -184,9 +216,13 @@ serve(async (req) => {
       let driveFilename = ''
       if (jenis === 'bpu' || jenis === 'pu') {
         driveFilename = `${jenis.toUpperCase()}_Kelompok_${kelompok}_${id}${safeExt}`
+      } else if (jenis === 'laporan') {
+        driveFilename = `${participantId}_${originalFilename}`
+      } else if (jenis === 'announcement-asset') {
+        driveFilename = `${Date.now()}_${originalFilename.replace(/[\\/]/g, '_')}`
       } else {
-        const tag = jenis === 'seminar' ? `seminar_${kegiatan}` : session
-        driveFilename = `${participantId}_${tanggal}_${tag}${safeExt}`
+        const tag = jenis === 'seminar' ? `_seminar_${kegiatan}` : ''
+        driveFilename = `${participantId}_${tanggal}${tag}${safeExt}`
       }
 
       driveFileId = await uploadToDrive(
@@ -199,10 +235,23 @@ serve(async (req) => {
       photoUrl = `https://drive.google.com/uc?export=view&id=${driveFileId}`
     } catch (driveError) {
       const message = driveError instanceof Error ? driveError.message : String(driveError)
-      console.warn(`Drive upload skipped for ${jenis}: ${message}`)
+      throw new Error(`Google Drive upload failed: ${message}`)
+    }
+
+    if (jenis === 'announcement-asset') {
+      return json({ ok: true, fileId: driveFileId, filename: originalFilename, mimeType: contentType }, CORS_HEADERS, 200)
     }
 
     if (jenis === 'bpu' || jenis === 'pu') {
+      if (!driveFileId || !photoUrl) {
+        throw new Error('Google Drive did not return a file URL')
+      }
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+      const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+      if (!supabaseUrl || !serviceRole) {
+        throw new Error('Supabase admin credentials are not configured')
+      }
+      const adminClient = createClient(supabaseUrl, serviceRole)
       const dbTable = jenis === 'bpu' ? 'akuisisi_bpu' : 'akuisisi_pu'
       const { error: insertError } = await adminClient
         .from(dbTable)
@@ -212,7 +261,7 @@ serve(async (req) => {
           nama_ktp: namaKtp,
           nik,
           jenis_kelamin: jenisKelamin,
-          storage_path: storagePath,
+          storage_path: photoUrl,
           filename: originalFilename,
           mime_type: typeFromQuery || 'application/pdf',
           size_bytes: sizeBytes || blob.size,
@@ -233,40 +282,129 @@ serve(async (req) => {
       return json({ ok: true, id, driveFileId, photoUrl, driveFallback: !driveFileId }, CORS_HEADERS, 200)
     }
 
-    const updates: Record<string, unknown> = {
-      photo_path: photoUrl,
-      photo_filename: originalFilename,
-    }
-
-    let query
-    if (jenis === 'seminar') {
-      query = adminClient
-        .from('seminar_attendance')
-        .update(updates)
-        .eq('participant_id', participantId)
-        .eq('tanggal', tanggal)
-        .eq('kegiatan', kegiatan)
-    } else {
-      query = adminClient
-        .from('attendance')
-        .update(updates)
-        .eq('participant_id', participantId)
-        .eq('tanggal', tanggal)
-        .eq('session', session)
-    }
-
-    const { error } = await query
-
-    if (error) {
-      throw new Error(`DB update failed: ${error.message}`)
-    }
-
     return json({ ok: true, driveFileId, photoUrl }, CORS_HEADERS, 200)
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return json({ ok: false, error: message }, CORS_HEADERS, 500)
   }
 })
+
+async function serveAdminPhoto(req: Request): Promise<Response> {
+  const authorization = req.headers.get('Authorization') || ''
+  const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1]
+  const fileId = new URL(req.url).searchParams.get('fileId') || ''
+  if (!token || !/^[a-zA-Z0-9_-]+$/.test(fileId)) {
+    return json({ error: 'Unauthorized or invalid file ID' }, CORS_HEADERS, 401)
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
+  if (!supabaseUrl || !anonKey) {
+    return json({ error: 'Supabase auth is not configured' }, CORS_HEADERS, 500)
+  }
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+  const { data: isAdmin, error: authError } = await userClient.rpc('is_admin')
+  if (authError || !isAdmin) {
+    return json({ error: 'Admin access required' }, CORS_HEADERS, 403)
+  }
+
+  const photoUrl = `https://drive.google.com/uc?export=view&id=${fileId}`
+  const [attendance, seminar] = await Promise.all([
+    userClient.from('attendance').select('id').eq('photo_path', photoUrl).limit(1),
+    userClient.from('seminar_attendance').select('id').eq('photo_path', photoUrl).limit(1),
+  ])
+  if (attendance.error || seminar.error) {
+    return json({ error: 'Failed to verify photo record' }, CORS_HEADERS, 500)
+  }
+  if (!attendance.data?.length && !seminar.data?.length) {
+    return json({ error: 'Photo not found' }, CORS_HEADERS, 404)
+  }
+
+  const accessToken = await getAccessToken()
+  const driveResponse = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+  if (!driveResponse.ok) {
+    return json({ error: `Google Drive returned HTTP ${driveResponse.status}` }, CORS_HEADERS, 502)
+  }
+
+  const contentType = driveResponse.headers.get('Content-Type') || 'application/octet-stream'
+  if (!contentType.startsWith('image/')) {
+    return json({ error: 'Drive file is not an image' }, CORS_HEADERS, 415)
+  }
+
+  return new Response(driveResponse.body, {
+    headers: {
+      ...CORS_HEADERS,
+      'Cache-Control': 'private, no-store',
+      'Content-Type': contentType,
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+}
+
+async function serveAnnouncementAsset(req: Request): Promise<Response> {
+  const url = new URL(req.url)
+  const announcementId = url.searchParams.get('announcementId') || ''
+  const asset = url.searchParams.get('asset')
+  if (!/^[0-9a-f-]{36}$/i.test(announcementId) || (asset !== 'image' && asset !== 'file')) {
+    return json({ error: 'Invalid announcement asset request' }, CORS_HEADERS, 400)
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
+  if (!supabaseUrl || !anonKey) {
+    return json({ error: 'Supabase is not configured' }, CORS_HEADERS, 500)
+  }
+
+  const client = createClient(supabaseUrl, anonKey)
+  const { data: announcement, error } = await client
+    .from('announcements')
+    .select('image_file_id, attachment_file_id, attachment_filename, attachment_mime_type')
+    .eq('id', announcementId)
+    .eq('is_published', true)
+    .maybeSingle()
+  if (error) return json({ error: 'Failed to verify published announcement' }, CORS_HEADERS, 500)
+  if (!announcement) return json({ error: 'Announcement not found' }, CORS_HEADERS, 404)
+
+  const fileId = asset === 'image' ? announcement.image_file_id : announcement.attachment_file_id
+  if (!fileId || !/^[a-zA-Z0-9_-]+$/.test(fileId)) {
+    return json({ error: 'Announcement file not found' }, CORS_HEADERS, 404)
+  }
+
+  const accessToken = await getAccessToken()
+  const driveResponse = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+  if (!driveResponse.ok) {
+    return json({ error: `Google Drive returned HTTP ${driveResponse.status}` }, CORS_HEADERS, 502)
+  }
+
+  const contentType = asset === 'image'
+    ? driveResponse.headers.get('Content-Type') || 'application/octet-stream'
+    : announcement.attachment_mime_type || 'application/octet-stream'
+  if (asset === 'image' && !contentType.startsWith('image/')) {
+    return json({ error: 'Announcement image is not an image file' }, CORS_HEADERS, 415)
+  }
+
+  const headers = new Headers({
+    ...CORS_HEADERS,
+    'Cache-Control': 'public, max-age=300',
+    'Content-Type': contentType,
+    'X-Content-Type-Options': 'nosniff',
+  })
+  if (asset === 'file') {
+    const filename = (announcement.attachment_filename || 'lampiran').replace(/[\r\n"\\]/g, '_')
+    headers.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`)
+  }
+
+  return new Response(driveResponse.body, { headers })
+}
 
 function json(body: unknown, extra: Record<string, string>, status: number): Response {
   return new Response(JSON.stringify(body), {

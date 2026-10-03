@@ -39,8 +39,12 @@ export function PhotoViewModal({ storagePath, filename, onClose }: {
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+
     const handleViewPhoto = async () => {
       if (!storagePath) {
         setLoading(false);
@@ -48,6 +52,34 @@ export function PhotoViewModal({ storagePath, filename, onClose }: {
       }
 
       try {
+        if (/^https?:\/\/drive\.google\.com\//i.test(storagePath)) {
+          const driveUrl = new URL(storagePath);
+          const fileId = driveUrl.searchParams.get('id');
+          const { data: { session } } = await supabase.auth.getSession();
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+          if (!fileId || !session?.access_token || !supabaseUrl || !anonKey) {
+            throw new Error('Sesi admin atau ID foto tidak tersedia');
+          }
+
+          const response = await fetch(
+            `${supabaseUrl}/functions/v1/upload-attendance?fileId=${encodeURIComponent(fileId)}`,
+            {
+              headers: {
+                apikey: anonKey,
+                Authorization: `Bearer ${session.access_token}`,
+              },
+            },
+          );
+          if (!response.ok) {
+            throw new Error(`Gagal mengambil foto (HTTP ${response.status})`);
+          }
+
+          objectUrl = URL.createObjectURL(await response.blob());
+          if (!cancelled) setUrl(objectUrl);
+          return;
+        }
+
         if (/^https?:\/\//i.test(storagePath)) {
           setUrl(storagePath);
           return;
@@ -65,13 +97,18 @@ export function PhotoViewModal({ storagePath, filename, onClose }: {
         setUrl(photoUrl);
       } catch (error) {
         console.error('Photo preview error:', error);
-        setUrl(null);
+        if (!cancelled) setUrl(null);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     handleViewPhoto();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [filename, storagePath]);
 
   if (!storagePath) return null;
@@ -84,8 +121,13 @@ export function PhotoViewModal({ storagePath, filename, onClose }: {
           <div style={{ textAlign: 'center', padding: 30 }}>
             <Spinner size={28} />
           </div>
-        ) : url ? (
-          <img src={url} alt={filename ?? 'foto'} style={{ width: '100%', borderRadius: 8 }} />
+        ) : url && !imageError ? (
+          <img
+            src={url}
+            alt={filename ?? 'foto'}
+            onError={() => setImageError(true)}
+            style={{ width: '100%', borderRadius: 8 }}
+          />
         ) : (
           <p>Gagal memuat foto.</p>
         )}

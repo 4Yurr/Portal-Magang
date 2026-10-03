@@ -10,10 +10,9 @@ const navItems = [
   { to: '/admin/seminar', label: 'Absensi Seminar' },
   { to: '/admin/viralisasi', label: 'Video Viralisasi' },
   { to: '/admin/laporan', label: 'Laporan' },
-  { to: '/admin/bpu', label: 'Akuisisi Data BPU' },
-  { to: '/admin/pu', label: 'Akuisisi Data PU' },
   { to: '/admin/materi', label: 'Materi PDF' },
   { to: '/admin/pengaturan', label: 'Pengaturan' },
+  { to: '/admin/pengumuman', label: 'Pengumuman' },
   { to: '/admin/export', label: 'Export Data' },
 ];
 

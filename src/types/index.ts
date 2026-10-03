@@ -1,8 +1,14 @@
 // Domain-level types used across the app.
 
-export type Session = 'PAGI' | 'SORE';
 export type AttendanceStatus = 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
 export type AttendanceStatusOption = 'Hadir' | 'Izin' | 'Sakit';
+
+export type AttendanceWindow = {
+  id: boolean;
+  open_time: string;
+  close_time: string;
+  updated_at: string;
+};
 
 export type Participant = {
   nim: string;
@@ -22,7 +28,6 @@ export type AttendanceRow = {
   kelompok: string | null;
   tanggal: string;
   jam: string;
-  session: 'PAGI' | 'SORE';
   status: AttendanceStatus;
   latitude: number | null;
   longitude: number | null;
@@ -99,6 +104,20 @@ export type MaterialRow = {
   storage_path: string;
   filename: string;
   is_active: boolean;
+};
+
+export type AnnouncementRow = {
+  id: string;
+  title: string;
+  content: string;
+  image_file_id: string | null;
+  image_filename: string | null;
+  attachment_file_id: string | null;
+  attachment_filename: string | null;
+  attachment_mime_type: string | null;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 export type GeoLocation = {

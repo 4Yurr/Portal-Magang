@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Portal Magang BPJS Ketenagakerjaan">
+  <defs>
+    <linearGradient id="bpjsGradient" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0B4F9C" />
+      <stop offset="100%" stop-color="#083B73" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bpjsGradient)"/>
+  <path d="M20 22.5h24v19H20z" fill="#fff" opacity="0.14"/>
+  <path d="M22 22V17.5h20V22" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20 26h24M20 30h24M20 34h14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M42 25.5v13.5h-6V29.5h-3v9h-7V25.5h16z" fill="#fff" opacity="0.94"/>
+  <path d="M34 29.5v9" fill="none" stroke="#0B4F9C" stroke-width="2" stroke-linecap="round"/>
+</svg>

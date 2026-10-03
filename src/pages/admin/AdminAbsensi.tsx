@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
 import { PhotoViewModal } from '../../components/admin/FileActions';
-import { deleteAttendance, fetchAttendance, updateAttendance } from '../../services/adminService';
-import type { AttendanceRow, AttendanceStatus } from '../../types';
+import { deleteAttendance, fetchAttendance } from '../../services/adminService';
+import type { AttendanceRow } from '../../types';
 import { formatDateTime, formatTime, formatDate } from '../../utils/constants';
 import { exportToExcel } from '../../utils/excel';
 
@@ -12,31 +12,46 @@ export default function AdminAbsensi() {
   const [data, setData] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tanggal, setTanggal] = useState('');
-  const [sesi, setSesi] = useState('');
   const [search, setSearch] = useState('');
   const [kelompok, setKelompok] = useState('');
   const [photo, setPhoto] = useState<AttendanceRow | null>(null);
-  const [editingRow, setEditingRow] = useState<AttendanceRow | null>(null);
-  const [statusDraft, setStatusDraft] = useState<AttendanceStatus>('Hadir');
-  const [tanggalDraft, setTanggalDraft] = useState('');
-  const [jamDraft, setJamDraft] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<AttendanceRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     const res = await fetchAttendance({
       date: tanggal || undefined,
-      session: sesi || undefined,
       search: search || undefined,
       kelompok: kelompok || undefined,
     });
     setData(res);
     setLoading(false);
-  }, [tanggal, sesi, search, kelompok]);
+  }, [tanggal, search, kelompok]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const removeAttendance = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const { error } = await deleteAttendance(deleteTarget.id);
+      if (error) {
+        showToast('Gagal menghapus data absensi.', 'error');
+        return;
+      }
+      setData((rows) => rows.filter((row) => row.id !== deleteTarget.id));
+      if (photo?.id === deleteTarget.id) setPhoto(null);
+      setDeleteTarget(null);
+      showToast('Data absensi berhasil dihapus dan tidak lagi muncul di rekap.', 'success');
+    } catch {
+      showToast('Gagal menghapus data absensi.', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleExport = () => {
     exportToExcel(
@@ -48,7 +63,6 @@ export default function AdminAbsensi() {
         { header: 'Kelompok', key: 'kelompok' },
         { header: 'Tanggal', key: 'tanggal' },
         { header: 'Jam', key: 'jam' },
-        { header: 'Sesi', key: 'session' },
         { header: 'Status', key: 'status' },
         { header: 'Latitude', key: 'latitude' },
         { header: 'Longitude', key: 'longitude' },
@@ -63,7 +77,6 @@ export default function AdminAbsensi() {
         kelompok: d.kelompok ?? '',
         tanggal: d.tanggal,
         jam: d.jam,
-        session: d.session,
         status: d.status,
         latitude: d.latitude,
         longitude: d.longitude,
@@ -72,33 +85,6 @@ export default function AdminAbsensi() {
       })),
       `Absensi_${tanggal || 'semua'}.xlsx`,
     ).then((r) => showToast(r.message, r.success ? 'success' : 'error'));
-  };
-
-  const handleUpdate = async (row: AttendanceRow) => {
-    const { error } = await updateAttendance(row.id, {
-      status: statusDraft,
-      tanggal: tanggalDraft,
-      jam: jamDraft + (jamDraft.length === 5 ? ':00' : ''),
-    });
-    if (error) {
-      showToast('Gagal mengubah data absensi', 'error');
-      return;
-    }
-    showToast('Data absensi berhasil diperbarui', 'success');
-    setEditingRow(null);
-    load();
-  };
-
-  const removeRow = async () => {
-    if (!deleteTarget) return;
-    const { error } = await deleteAttendance(deleteTarget.id);
-    if (error) {
-      showToast('Gagal menghapus absensi', 'error');
-      return;
-    }
-    showToast('Data absensi berhasil dihapus', 'success');
-    setDeleteTarget(null);
-    load();
   };
 
   return (
@@ -110,14 +96,6 @@ export default function AdminAbsensi() {
           <div className="toolbar-field">
             <label>Tanggal</label>
             <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
-          </div>
-          <div className="toolbar-field">
-            <label>Sesi</label>
-            <select value={sesi} onChange={(e) => setSesi(e.target.value)}>
-              <option value="">Semua</option>
-              <option value="PAGI">Pagi</option>
-              <option value="SORE">Sore</option>
-            </select>
           </div>
           <div className="toolbar-field">
             <label>Kelompok</label>
@@ -152,7 +130,6 @@ export default function AdminAbsensi() {
                   <th>Nama</th>
                   <th>Tanggal</th>
                   <th>Jam</th>
-                  <th>Sesi</th>
                   <th>Status</th>
                   <th>Lat</th>
                   <th>Lon</th>
@@ -168,7 +145,6 @@ export default function AdminAbsensi() {
                     <td><strong>{d.nama}</strong></td>
                     <td>{formatDate(d.tanggal)}</td>
                     <td>{formatTime(d.jam)}</td>
-                    <td><span className="badge badge-blue">{d.session}</span></td>
                     <td>
                       <span className={`badge ${d.status === 'Hadir' ? 'badge-success' : d.status === 'Izin' ? 'badge-warning' : d.status === 'Sakit' ? 'badge-neutral' : 'badge-danger'}`}>{d.status}</span>
                     </td>
@@ -185,25 +161,15 @@ export default function AdminAbsensi() {
                     </td>
                     <td>{formatDateTime(d.created_at)}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.72rem' }} onClick={() => {
-                          setEditingRow(d);
-                          setStatusDraft(d.status);
-                          setTanggalDraft(d.tanggal);
-                          setJamDraft(d.jam ? d.jam.slice(0, 5) : '');
-                        }}>
-                          Edit
-                        </button>
-                        <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '0.72rem' }} onClick={() => setDeleteTarget(d)}>
-                          Hapus
-                        </button>
-                      </div>
+                      <button className="btn btn-danger" onClick={() => setDeleteTarget(d)}>
+                        Hapus
+                      </button>
                     </td>
                   </tr>
                 ))}
                 {data.length === 0 && (
                   <tr>
-                    <td colSpan={11} style={{ textAlign: 'center', padding: 30 }}>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: 30 }}>
                       Tidak ada data absensi.
                     </td>
                   </tr>
@@ -214,49 +180,29 @@ export default function AdminAbsensi() {
         </div>
       </div>
 
-      {editingRow && (
-        <div className="modal-overlay" onClick={() => setEditingRow(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Ubah Data Absensi</h3>
-            <p>
-              <strong>{editingRow.nama}</strong> — NIM: {editingRow.nim} ({editingRow.session})
-            </p>
-            <label>Tanggal</label>
-            <input type="date" value={tanggalDraft} onChange={(e) => setTanggalDraft(e.target.value)} />
-            <label>Jam</label>
-            <input type="time" value={jamDraft} onChange={(e) => setJamDraft(e.target.value)} />
-            <label>Status</label>
-            <select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value as AttendanceStatus)}>
-              <option value="Hadir">Hadir</option>
-              <option value="Izin">Izin</option>
-              <option value="Sakit">Sakit</option>
-              <option value="Ditolak">Ditolak</option>
-            </select>
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button className="btn btn-primary" onClick={() => handleUpdate(editingRow)}>Simpan</button>
-              <button className="btn btn-outline" onClick={() => setEditingRow(null)}>Batal</button>
-            </div>
-          </div>
-        </div>
+      {photo && (
+        <PhotoViewModal storagePath={photo.photo_path} filename={photo.photo_filename} onClose={() => setPhoto(null)} />
       )}
 
       {deleteTarget && (
-        <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Konfirmasi Hapus</h3>
+        <div className="modal-overlay" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <h3>Konfirmasi Hapus Absensi</h3>
             <p>
-              Yakin ingin menghapus data absensi <strong>{deleteTarget.nama}</strong> pada {deleteTarget.tanggal} ({deleteTarget.session})?
+              Hapus absensi <strong>{deleteTarget.nama ?? deleteTarget.nim}</strong> tanggal {formatDate(deleteTarget.tanggal)}?
+              <br />
+              Data ini juga akan hilang dari rekap absensi biasa dan tidak dapat dikembalikan.
             </p>
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button className="btn btn-danger" onClick={removeRow}>Hapus Permanen</button>
-              <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>Batal</button>
+              <button className="btn btn-danger" onClick={removeAttendance} disabled={deleting}>
+                {deleting ? <Spinner size={14} /> : 'Hapus Permanen'}
+              </button>
+              <button className="btn btn-outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                Batal
+              </button>
             </div>
           </div>
         </div>
-      )}
-
-      {photo && (
-        <PhotoViewModal storagePath={photo.photo_path} filename={photo.photo_filename} onClose={() => setPhoto(null)} />
       )}
     </div>
   );

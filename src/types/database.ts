@@ -40,7 +40,6 @@ export interface Database {
           id: string;
           participant_id: string;
           tanggal: string;
-          session: 'PAGI' | 'SORE';
           jam: string;
           status: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           latitude: number | null;
@@ -54,7 +53,6 @@ export interface Database {
         Insert: {
           participant_id: string;
           tanggal: string;
-          session: 'PAGI' | 'SORE';
           jam: string;
           status?: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           latitude?: number | null;
@@ -64,12 +62,71 @@ export interface Database {
           photo_filename?: string | null;
         };
         Update: {
-          session?: 'PAGI' | 'SORE';
           tanggal?: string;
           jam?: string;
           status?: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           photo_path?: string | null;
           photo_filename?: string | null;
+        };
+        Relationships: [];
+      };
+      daily_attendance_window: {
+        Row: {
+          id: boolean;
+          open_time: string;
+          close_time: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: boolean;
+          open_time: string;
+          close_time: string;
+          updated_at?: string;
+        };
+        Update: {
+          open_time?: string;
+          close_time?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      announcements: {
+        Row: {
+          id: string;
+          title: string;
+          content: string;
+          image_file_id: string | null;
+          image_filename: string | null;
+          attachment_file_id: string | null;
+          attachment_filename: string | null;
+          attachment_mime_type: string | null;
+          is_published: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          content?: string;
+          image_file_id?: string | null;
+          image_filename?: string | null;
+          attachment_file_id?: string | null;
+          attachment_filename?: string | null;
+          attachment_mime_type?: string | null;
+          is_published?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          title?: string;
+          content?: string;
+          image_file_id?: string | null;
+          image_filename?: string | null;
+          attachment_file_id?: string | null;
+          attachment_filename?: string | null;
+          attachment_mime_type?: string | null;
+          is_published?: boolean;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -263,7 +320,6 @@ export interface Database {
           kelompok: string | null;
           tanggal: string;
           jam: string;
-          session: 'PAGI' | 'SORE';
           status: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           latitude: number | null;
           longitude: number | null;
@@ -315,10 +371,6 @@ export interface Database {
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };
       now_wib: { Args: Record<string, never>; Returns: string };
-      attendance_open_info: {
-        Args: Record<string, never>;
-        Returns: { session: string; is_open: boolean; message: string }[];
-      };
     };
   };
 }

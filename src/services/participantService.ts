@@ -42,23 +42,21 @@ export async function getParticipant(nim: string) {
 // ============================================================================
 export async function uploadAttendancePhoto(opts: {
   nim: string;
-  tanggal: string;
-  session?: 'PAGI' | 'SORE';
+  tanggal?: string;
   kegiatan?: string;
-  jenis: 'biasa' | 'seminar';
+  jenis: 'biasa' | 'seminar' | 'laporan';
   filename: string;
   file: File;
-}): Promise<{ ok: boolean; error: string }> {
+}): Promise<{ ok: boolean; url: string | null; error: string }> {
   try {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     const qs = new URLSearchParams({
       nim: opts.nim,
-      tanggal: opts.tanggal,
       jenis: opts.jenis,
       filename: opts.filename,
     });
-    if (opts.session) qs.set('session', opts.session);
+    if (opts.tanggal) qs.set('tanggal', opts.tanggal);
     if (opts.kegiatan) qs.set('kegiatan', opts.kegiatan);
     if (opts.file.type) qs.set('type', opts.file.type);
     const res = await fetch(
@@ -74,11 +72,14 @@ export async function uploadAttendancePhoto(opts: {
     );
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {
-      return { ok: false, error: data.error || `HTTP ${res.status}` };
+      return { ok: false, url: null, error: data.error || `HTTP ${res.status}` };
     }
-    return { ok: true, error: '' };
+    if (typeof data.photoUrl !== 'string' || !data.photoUrl.startsWith('https://drive.google.com/')) {
+      return { ok: false, url: null, error: 'Google Drive tidak mengembalikan URL file.' };
+    }
+    return { ok: true, url: data.photoUrl, error: '' };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    return { ok: false, url: null, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -91,34 +92,12 @@ export async function uploadAkuisisiFileToDrive(opts: {
   namaKtp: string;
   nik: string;
   jenisKelamin: 'Laki-laki' | 'Perempuan';
-  storagePath: string;
 }): Promise<{ ok: boolean; error: string; id?: string }> {
-  const table = opts.jenis === 'bpu' ? 'akuisisi_bpu' : 'akuisisi_pu';
-  const dbPayload = {
-    id: opts.id,
-    kelompok: opts.kelompok,
-    nama_ktp: opts.namaKtp,
-    nik: opts.nik,
-    jenis_kelamin: opts.jenisKelamin,
-    storage_path: opts.storagePath,
-    filename: opts.filename,
-    mime_type: opts.file.type || 'application/octet-stream',
-    size_bytes: opts.file.size,
-  };
-
-  const insertDirectly = async () => {
-    const { error } = await supabase.from(table).insert(dbPayload);
-    if (error) {
-      return { ok: false, error: error.message, id: undefined };
-    }
-    return { ok: true, error: '', id: opts.id };
-  };
-
   try {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !anonKey) {
-      return insertDirectly();
+      return { ok: false, error: 'Konfigurasi Supabase tidak tersedia.' };
     }
 
     const qs = new URLSearchParams({
@@ -129,7 +108,6 @@ export async function uploadAkuisisiFileToDrive(opts: {
       nama_ktp: opts.namaKtp,
       nik: opts.nik,
       jenis_kelamin: opts.jenisKelamin,
-      storage_path: opts.storagePath,
       mime_type: opts.file.type || 'application/octet-stream',
       size_bytes: String(opts.file.size),
     });
@@ -148,23 +126,13 @@ export async function uploadAkuisisiFileToDrive(opts: {
     );
 
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data.ok) {
+    if (res.ok && data.ok && typeof data.photoUrl === 'string' && data.photoUrl.startsWith('https://drive.google.com/')) {
       return { ok: true, error: '', id: data.id || opts.id };
     }
 
-    const message = String(data?.error || `HTTP ${res.status}`);
-    const directFallback = await insertDirectly();
-    if (directFallback.ok) {
-      return directFallback;
-    }
-    return { ok: false, error: message || directFallback.error };
+    return { ok: false, error: String(data?.error || `HTTP ${res.status}`) };
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    const directFallback = await insertDirectly();
-    if (directFallback.ok) {
-      return directFallback;
-    }
-    return { ok: false, error: message || directFallback.error };
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -194,64 +162,42 @@ export async function getServerWib(): Promise<{ date: Date }> {
   };
 }
 
-// ---- Upload to Supabase Storage (returns storage path) ----
-export async function uploadFile(
-  bucket: string,
-  path: string,
-  file: File,
-  upsert = false,
-): Promise<{ path: string | null; error: string | null }> {
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    cacheControl: '3600',
-    upsert,
-    contentType: file.type,
-  });
-  if (error) {
-    return { path: null, error: error.message };
-  }
-  return { path, error: null };
-}
-
-// ---- Generic file metadata ----
-export type StoredFile = {
-  bucket: string;
-  path: string;
-  filename: string;
-  mimeType: string;
-  size: number;
-};
-
 // ============================================================================
 // ABSENSI BIASA
 // ============================================================================
 export async function submitAttendance(payload: {
   participant_id: string;
   tanggal: string;
-  session: 'PAGI' | 'SORE';
   jam: string;
   latitude: number;
   longitude: number;
   accuracy: number;
-  file: StoredFile | null;
+  photoUrl: string | null;
+  photoFilename: string | null;
 }): Promise<{ success: boolean; message: string }> {
   const { error } = await supabase.from('attendance').insert({
     participant_id: payload.participant_id,
     tanggal: payload.tanggal,
-    session: payload.session,
     jam: payload.jam,
     latitude: payload.latitude,
     longitude: payload.longitude,
     accuracy: payload.accuracy,
-    photo_path: payload.file ? `${payload.file.bucket}/${payload.file.path}` : null,
-    photo_filename: payload.file ? payload.file.filename : null,
+    photo_path: payload.photoUrl,
+    photo_filename: payload.photoFilename,
     status: 'Hadir',
   });
   if (error) {
     const msg = (error.message || '') as string;
+    if (msg.includes('ATTENDANCE_WINDOW_CLOSED')) {
+      return { success: false, message: 'Absensi sedang ditutup. Silakan kirim pada jam yang telah ditentukan.' };
+    }
+    if (msg.includes('ATTENDANCE_WINDOW_NOT_CONFIGURED')) {
+      return { success: false, message: 'Jadwal absensi belum dikonfigurasi. Hubungi admin.' };
+    }
     if (msg.toLowerCase().includes('duplicate') || msg.includes('uq_attendance')) {
       return {
         success: false,
-        message: 'Anda sudah melakukan absensi untuk sesi ini pada tanggal ini.',
+        message: 'Anda sudah melakukan absensi hari ini.',
       };
     }
     if (msg.includes('participants')) {
@@ -274,7 +220,8 @@ export async function submitSeminar(payload: {
   latitude: number;
   longitude: number;
   accuracy: number;
-  file: StoredFile | null;
+  photoUrl: string | null;
+  photoFilename: string | null;
 }): Promise<{ success: boolean; message: string }> {
   const { error } = await supabase.from('seminar_attendance').insert({
     participant_id: payload.participant_id,
@@ -284,8 +231,8 @@ export async function submitSeminar(payload: {
     latitude: payload.latitude,
     longitude: payload.longitude,
     accuracy: payload.accuracy,
-    photo_path: payload.file ? `${payload.file.bucket}/${payload.file.path}` : null,
-    photo_filename: payload.file ? payload.file.filename : null,
+    photo_path: payload.photoUrl,
+    photo_filename: payload.photoFilename,
     status: 'Hadir',
   });
   if (error) {
@@ -331,15 +278,18 @@ export async function submitInstagram(payload: {
 export async function submitReport(payload: {
   participant_id: string;
   judul: string;
-  file: StoredFile;
+  fileUrl: string;
+  filename: string;
+  mimeType: string;
+  size: number;
 }): Promise<{ success: boolean; message: string }> {
   const { error } = await supabase.from('reports').insert({
     participant_id: payload.participant_id,
     judul: payload.judul,
-    storage_path: `${payload.file.bucket}/${payload.file.path}`,
-    filename: payload.file.filename,
-    mime_type: payload.file.mimeType,
-    size_bytes: payload.file.size,
+    storage_path: payload.fileUrl,
+    filename: payload.filename,
+    mime_type: payload.mimeType,
+    size_bytes: payload.size,
   });
   if (error) {
     const msg = (error.message || '') as string;
@@ -362,7 +312,10 @@ export async function submitAkuisisi(
     nama_ktp: string;
     nik: string;
     jenis_kelamin: 'Laki-laki' | 'Perempuan';
-    file: StoredFile;
+    fileUrl: string;
+    filename: string;
+    mimeType: string;
+    size: number;
   },
 ): Promise<{ success: boolean; message: string; id?: string }> {
   const id = crypto.randomUUID();
@@ -372,10 +325,10 @@ export async function submitAkuisisi(
     nama_ktp: payload.nama_ktp,
     nik: payload.nik,
     jenis_kelamin: payload.jenis_kelamin,
-    storage_path: `${payload.file.bucket}/${payload.file.path}`,
-    filename: payload.file.filename,
-    mime_type: payload.file.mimeType,
-    size_bytes: payload.file.size,
+    storage_path: payload.fileUrl,
+    filename: payload.filename,
+    mime_type: payload.mimeType,
+    size_bytes: payload.size,
   });
   if (error) {
     console.error(`submitAkuisisi (${table}) error:`, error);

@@ -3,11 +3,11 @@
 Rebuild modern (Vite + React + TypeScript + Supabase) dari aplikasi magang berbasis
 Google Apps Script + Spreadsheet + Drive. Terdiri dari:
 
-- **Portal Peserta** (mobile-first): absensi, seminar, viralisasi TikTok, laporan, akuisisi BPU/PU, dan download materi.
-- **Portal Admin** (desktop-first): dashboard, kelola peserta, validasi semua kiriman, dan **export Excel** (`.xlsx`).
+- **Portal Peserta** (mobile-first): absensi harian, seminar, pengumuman, viralisasi, laporan, dan download materi.
+- **Portal Admin** (desktop-first): dashboard, kelola peserta, absensi bulanan, pengumuman, dan **export Excel** (`.xlsx`).
 
 Backend sepenuhnya di **Supabase** (PostgreSQL + Auth + Storage). Tidak ada server Node sendiri — validasi sisi server
-dilakukan lewat **RLS**, **constraint DB**, dan **waktu WIB** yang dihitung di browser.
+ditegakkan di database memakai **RLS**, **unique constraint**, dan **waktu WIB server**.
 
 ---
 
@@ -17,7 +17,7 @@ dilakukan lewat **RLS**, **constraint DB**, dan **waktu WIB** yang dihitung di b
 | --- | --- |
 | Frontend | Vite + React 18 + TypeScript |
 | Router | react-router-dom |
-| Backend | Supabase (PostgreSQL, Auth, Storage) |
+| Backend | Supabase (PostgreSQL, Auth, Edge Functions) + Google Drive |
 | Export Excel | ExcelJS + file-saver |
 | Tema | BPJS biru (light only) |
 
@@ -39,18 +39,18 @@ dilakukan lewat **RLS**, **constraint DB**, dan **waktu WIB** yang dihitung di b
 src/
   lib/            supabaseClient.ts
   types/          index.ts (domain types), database.ts (tipe tabel)
-  utils/          constants.ts (window absen, validasi, WIB, masking NIK),
+  utils/          constants.ts (jendela absensi, validasi, WIB),
                   excel.ts (export .xlsx)
   services/       participantService.ts, adminService.ts
   hooks/          useAuth.ts, useParticipantSearch.ts, useGeolocation.ts
   components/     ui/*, participant/*, admin/*
   layouts/        ParticipantLayout.tsx, AdminLayout.tsx
   pages/
-    participant/  Home, Absensi, Seminar, Viralisasi, Laporan, AkuisisiBPU, AkuisisiPU, Materi
-    admin/        Login, Dashboard, Peserta, AdminAbsensi, AdminSeminar,
-                  AdminViralisasi, AdminLaporan, AdminBPU, AdminPU, AdminMateri, ExportData
+    participant/  Home, Absensi, Seminar, Pengumuman, Viralisasi, Laporan, Materi
+    admin/        Login, Dashboard, Peserta, AdminAbsensi, AdminRekapAbsensi,
+                  AdminSeminar, AdminPengumuman, AdminViralisasi, AdminLaporan, AdminMateri, ExportData
 supabase/
-  migrations/     0001-0010 (schema, RLS, storage, and upload fixes)
+  migrations/     0001-0013 (schema, RLS, daily attendance, announcements)
   seed/           participants.sql (15 contoh), admin_how_to.sql
 public/materials/ BPU.pdf, PU.pdf, dan brosur BPJS 2026 (file materi yang disajikan peserta)
 ```
@@ -63,9 +63,7 @@ public/materials/ BPU.pdf, PU.pdf, dan brosur BPJS 2026 (file materi yang disaji
 2. Buka **SQL Editor**, jalankan file migrasi **secara urut**:
    - `supabase/migrations/0001_initial_schema.sql`
    - `supabase/migrations/0002_materials_and_functions.sql`
-   - Jalankan migration lanjutan `0003` sampai `0010` secara berurutan, terutama
-     `supabase/migrations/0010_fix_public_acquisition_insert.sql` untuk memperbaiki
-     submit data PU/BPU dari peserta tanpa login.
+   - Jalankan migration lanjutan `0003` sampai `0013` secara berurutan.
    (Ini membuat tabel, fungsi `is_admin()`, **RLS**, bucket storage, view, dan seed materi.)
 3. **(Opsional) Seed peserta contoh**: jalankan `supabase/seed/participants.sql`
    untuk 15 peserta, atau isi sendiri tabel `public.participants`.
@@ -128,27 +126,21 @@ npm run lint
 
 ## Panduan Manual (Business Rules)
 
-**Absensi** (per sesi/hari, waktu WIB `Asia/Jakarta`):
+**Absensi biasa** (maksimal sekali sehari, waktu WIB `Asia/Jakarta`):
 
-- PAGI : 08:00 – 09:30
-- SORE : 15:30 – 17:00
-- Di luar jendela → **Ditolak**. Waktu server (`now_wib()`) otoritatif; browser hanya bantu.
-- Harus memilih peserta (NIM) dan mencentang **kehadiran**; foto kehadiran opsional (validasi tipe/menit),
-  upload ke bucket `attendance-photos`.
-- **Duplikat diblokir** oleh unique constraint `(participant_id, tanggal, session)`.
+- Satu jam buka dan jam tutup diatur admin melalui menu Pengaturan.
+- Di luar jendela → absensi ditolak oleh trigger database berdasarkan waktu server WIB.
+- Foto dikirim melalui Supabase Edge Function ke Google Drive; database menyimpan URL Drive.
+- **Duplikat diblokir** oleh unique constraint `(participant_id, tanggal)`.
 - GPS: catat lat/lng/accuracy dari Geolocation API (tanpa tolak radius). Tangani
   `PERMISSION_DENIED` / `POSITION_UNAVAILABLE` / `TIMEOUT` dengan pesan ramah.
 
-**Seminar**: absen ringkas (NIM + status Hadir). **Viralisasi**: NIM + tautan TikTok
-(hanya host `tiktok.com`: `www.`, `vt.`, `vm.`, `m.`).
+**Seminar** tetap dicatat terpisah dari absensi harian. **Viralisasi** menyimpan tautan Instagram.
 
-**Laporan**: PDF saja, maks **10 MB** (validasi frontend + DB), upload ke bucket `reports`.
+**Laporan**: PDF saja, maks **10 MB**, dikirim ke Google Drive.
 
-**Akuisisi BPU / PU** (formulir):
-- Hanya **Kelompok + Nama KTP + NIK (16 digit) + Jenis Kelamin** + upload formulir.
-- NIK bersifat **sensitif → dimasking** secara default di tampilan.
-- Boleh kosong (bilangan harus 16 digit jika diisi) — ikuti aturan formulir legacy.
-- File di-upload ke bucket `bpu` / `pu`.
+**Pengumuman**: admin dapat menerbitkan judul, teks, gambar, dan satu lampiran. File disimpan di Google Drive;
+peserta hanya melihat pengumuman terbit dan mengunduh lampiran.
 
 **Materi**: bucket `materials` publik; `BPU.pdf` & `PU.pdf` bisa diunduh peserta.
 
@@ -158,11 +150,12 @@ npm run lint
 
 - [ ] `npm install`, `npm run dev`, buka `http://localhost:5173` — halaman utama muncul.
 - [ ] Pilih NIM peserta → nama/fakultas/prodi/kelompok terisi otomatis (readonly).
-- [ ] Absen PAGI dalam 08:00–09:30 → Hadir; di luar → Ditolak; duplikat → tolak.
+- [ ] Absen dalam jam yang dikonfigurasi → Hadir; di luar jam atau duplikat harian → ditolak.
 - [ ] GPS: izinkan → catat lokasi; tolak → pesan error ramah (tetap bisa lanjut).
 - [ ] Buat admin via `admin_roles`, login di `/login` → bisa akses semua menu.
-- [ ] Export Excel dari admin (peserta, absensi, seminar, viralisasi, laporan, BPU, PU) → file `.xlsx` terunduh.
-- [ ] NIK tampil termasking (mis. `123********4567`), hanya admin (role) dapat melihat penuh.
+- [ ] Rekap absensi admin menampilkan bulan terpilih dan status bisa diperbarui.
+- [ ] Pengumuman dapat diterbitkan dengan gambar/lampiran, dan peserta dapat mengunduh lampiran.
+- [ ] Export Excel dari admin (peserta, absensi, seminar, viralisasi, laporan) → file `.xlsx` terunduh.
 - [ ] Upload materi BPU.pdf/PU.pdf ke bucket `materials` → peserta bisa buka/download.
 - [ ] `npm run lint` & `npm run build` tanpa error.
 

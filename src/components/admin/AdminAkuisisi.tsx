@@ -172,7 +172,7 @@ export function AdminAkuisisi({ type, title, table }: Props) {
                           Lihat
                         </button>
                       ) : null}
-                      <DownloadButton storagePath={d.storage_path} filename={d.filename} label="Download" />
+                      <DownloadButton storagePath={d.drive_url || d.storage_path} filename={d.filename} label="Download" />
                       <button
                         className="btn btn-outline"
                         style={{ padding: '5px 9px', fontSize: '0.78rem' }}
@@ -211,7 +211,7 @@ export function AdminAkuisisi({ type, title, table }: Props) {
 
       {fileView && (
         <FileModal
-          storagePath={fileView.storage_path}
+          storagePath={fileView.drive_url || fileView.storage_path}
           filename={fileView.filename}
           mimeType={fileView.mime_type}
           onClose={() => setFileView(null)}

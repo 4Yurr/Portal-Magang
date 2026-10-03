@@ -1,13 +1,13 @@
 import { useNavigate } from 'react-router-dom';
+import { AppIcon, type AppIconName } from '../../components/ui/AppIcon';
 
-const menus = [
-  { to: '/absensi', icon: '📝', title: 'ABSENSI – Kehadiran Biasa', desc: 'Catat kehadiran harian' },
-  { to: '/seminar', icon: '🎓', title: 'ABSENSI SEMINAR', desc: 'Presensi seminar & webinar' },
-  { to: '/viralisasi', icon: '📱', title: 'UPLOAD VIDEO VIRALISASI', desc: 'Kirim link video viralisasi' },
-  { to: '/laporan', icon: '📄', title: 'UPLOAD LAPORAN', desc: 'Kirim dokumen laporan (PDF)' },
-  { to: '/pu', icon: '🏢', title: 'AKUISISI DATA PU', desc: 'Pendataan peserta Penerima Upah' },
-  { to: '/bpu', icon: '👥', title: 'AKUISISI DATA BPU', desc: 'Pendataan peserta Bukan Penerima Upah' },
-  { to: '/materi', icon: '📚', title: 'MATERI & FORMULIR', desc: 'Download materi / formulir PDF' },
+const menus: Array<{ to: string; icon: AppIconName; title: string; desc: string }> = [
+  { to: '/absensi', icon: 'attendance', title: 'ABSENSI – Kehadiran Biasa', desc: 'Catat kehadiran harian' },
+  { to: '/seminar', icon: 'seminar', title: 'ABSENSI SEMINAR', desc: 'Presensi seminar & webinar' },
+  { to: '/viralisasi', icon: 'video', title: 'UPLOAD VIDEO VIRALISASI', desc: 'Kirim link video viralisasi' },
+  { to: '/laporan', icon: 'report', title: 'UPLOAD LAPORAN', desc: 'Kirim dokumen laporan (PDF)' },
+  { to: '/pengumuman', icon: 'announcement', title: 'PENGUMUMAN', desc: 'Informasi terbaru kegiatan magang' },
+  { to: '/materi', icon: 'material', title: 'MATERI & FORMULIR', desc: 'Download materi / formulir PDF' },
 ];
 
 export default function Home() {
@@ -17,7 +17,7 @@ export default function Home() {
       <div className="menu-grid">
         {menus.map((m) => (
           <div key={m.to} className="menu-card" onClick={() => navigate(m.to)} role="button" tabIndex={0}>
-            <div className="menu-icon">{m.icon}</div>
+            <div className="menu-icon"><AppIcon name={m.icon} size={20} /></div>
             <div>
               <h3>{m.title}</h3>
               <p>{m.desc}</p>

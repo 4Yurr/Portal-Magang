@@ -5,10 +5,11 @@ import { useParticipantSearch } from '../../hooks/useParticipantSearch';
 import { LocationPicker } from '../../components/participant/LocationPicker';
 import { ParticipantSearch } from '../../components/ui/ParticipantSearch';
 import { Spinner } from '../../components/ui/Spinner';
+import { AppIcon } from '../../components/ui/AppIcon';
 import type { GeoLocation } from '../../types';
 import { fetchAttendanceSettings } from '../../services/adminService';
-import { getServerWib, submitAttendance, uploadFile } from '../../services/participantService';
-import { evalSessionWindowByConfig, wibDateString, wibTimeString, isValidPhoto, formatBytes } from '../../utils/constants';
+import { getServerWib, submitAttendance, uploadAttendancePhoto } from '../../services/participantService';
+import { evalTimeWindowByConfig, wibDateString, wibTimeString, isValidPhoto, formatBytes } from '../../utils/constants';
 
 export default function Absensi() {
   const navigate = useNavigate();
@@ -18,10 +19,7 @@ export default function Absensi() {
   const [serverWibDate, setServerWibDate] = useState<Date | null>(null);
   const [lokasiKegiatan, setLokasiKegiatan] = useState('');
   const [location, setLocation] = useState<GeoLocation | null>(null);
-  const [attendanceSettings, setAttendanceSettings] = useState<Record<'PAGI' | 'SORE', { start: string; end: string; isActive: boolean }>>({
-    PAGI: { start: '08:00:00', end: '09:30:00', isActive: true },
-    SORE: { start: '15:30:00', end: '17:00:00', isActive: true },
-  });
+  const [attendanceWindow, setAttendanceWindow] = useState({ open: '08:00:00', close: '17:00:00' });
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -37,22 +35,10 @@ export default function Absensi() {
     const { date } = await getServerWib();
     setServerWibDate(date);
 
-    const settings = await fetchAttendanceSettings();
-    const mapped = {
-      PAGI: { start: '08:00:00', end: '09:30:00', isActive: true },
-      SORE: { start: '15:30:00', end: '17:00:00', isActive: true },
-    } as Record<'PAGI' | 'SORE', { start: string; end: string; isActive: boolean }>;
-
-    settings.forEach((cfg) => {
-      const session = cfg.session as 'PAGI' | 'SORE';
-      mapped[session] = {
-        start: cfg.start_time,
-        end: cfg.end_time,
-        isActive: cfg.is_active,
-      };
-    });
-
-    setAttendanceSettings(mapped);
+    const window = await fetchAttendanceSettings();
+    if (window) {
+      setAttendanceWindow({ open: window.open_time, close: window.close_time });
+    }
   }, []);
 
   useEffect(() => {
@@ -62,9 +48,7 @@ export default function Absensi() {
   }, [refreshServerTime]);
 
   const now = serverWibDate ?? new Date();
-  const pagi = evalSessionWindowByConfig(now, attendanceSettings.PAGI.start, attendanceSettings.PAGI.end);
-  const sore = evalSessionWindowByConfig(now, attendanceSettings.SORE.start, attendanceSettings.SORE.end);
-  const activeSession = pagi.isOpen && attendanceSettings.PAGI.isActive ? 'PAGI' : sore.isOpen && attendanceSettings.SORE.isActive ? 'SORE' : null;
+  const attendanceStatus = evalTimeWindowByConfig(now, attendanceWindow.open, attendanceWindow.close);
 
   const handlePhoto = (file: File | null) => {
     setPhoto(file);
@@ -75,41 +59,38 @@ export default function Absensi() {
   const handleSubmit = async () => {
     if (!selected) return showToast('Pilih peserta (NIM) terlebih dahulu', 'error');
     if (!lokasiKegiatan.trim()) return showToast('Lokasi kegiatan wajib diisi', 'error');
-    if (!activeSession) {
-      return showToast('Absensi saat ini belum dibuka. Sesi Pagi 08:00-09:30 atau Sesi Sore 15:30-17:00 WIB.', 'error');
+    if (!attendanceStatus.isOpen) {
+      return showToast(`Absensi dibuka pukul ${attendanceWindow.open.slice(0, 5)} sampai ${attendanceWindow.close.slice(0, 5)} WIB.`, 'error');
     }
     if (!location) return showToast('Silakan klik Ambil Lokasi terlebih dahulu', 'error');
     if (!photo) return showToast('Foto kegiatan wajib dipilih', 'error');
 
-    const session = activeSession;
     setSubmitting(true);
     try {
       const fileExtension = photo.name.includes('.') ? photo.name.split('.').pop()?.toLowerCase() : 'jpg';
       const userId = selected.nim.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-      const newFileName = `${userId}_${new Date().toISOString().split('T')[0]}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension || 'jpg'}`;
-      const renamedPhoto = new File([photo], newFileName, { type: photo.type });
-      const photoUp = await uploadFile('attendance-photos', newFileName, renamedPhoto);
-      if (!photoUp.path) {
+      const newFileName = `${userId}_${wibDateString(now)}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension || 'jpg'}`;
+      const photoUp = await uploadAttendancePhoto({
+        nim: selected.nim,
+        tanggal: wibDateString(now),
+        jenis: 'biasa',
+        filename: newFileName,
+        file: photo,
+      });
+      if (!photoUp.url) {
         showToast(`Foto gagal diunggah. Absensi belum disimpan: ${photoUp.error ?? 'unknown'}`, 'error');
         return;
       }
-      const storedFile = {
-        bucket: 'attendance-photos',
-        path: photoUp.path,
-        filename: newFileName,
-        mimeType: renamedPhoto.type || 'image/jpeg',
-        size: renamedPhoto.size,
-      };
 
       const res = await submitAttendance({
         participant_id: selected.nim,
         tanggal: wibDateString(now),
-        session: session as 'PAGI' | 'SORE',
         jam: wibTimeString(now),
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
-        file: storedFile,
+        photoUrl: photoUp.url,
+        photoFilename: newFileName,
       });
 
       showToast(res.message, res.success ? 'success' : 'error');
@@ -140,20 +121,17 @@ export default function Absensi() {
         </div>
 
         <div className="info-banner">
-          <span>⏰</span>
+          <AppIcon name="attendance" size={18} />
           <div>
-            <strong>Jadwal Absensi:</strong> Sesi Pagi ({attendanceSettings.PAGI.start.slice(0, 5)} – {attendanceSettings.PAGI.end.slice(0, 5)} WIB) & Sesi Sore ({attendanceSettings.SORE.start.slice(0, 5)} – {attendanceSettings.SORE.end.slice(0, 5)} WIB)
+            <strong>Jadwal Absensi:</strong> {attendanceWindow.open.slice(0, 5)} – {attendanceWindow.close.slice(0, 5)} WIB
             <br />
             <em>Waktu server: {wibDateString(now)} {wibTimeString(now)} WIB</em>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-          <span className={`badge ${pagi.isOpen && attendanceSettings.PAGI.isActive ? 'badge-success' : 'badge-neutral'}`}>
-            {pagi.isOpen && attendanceSettings.PAGI.isActive ? 'Absensi Pagi Dibuka' : 'Absensi Pagi Ditutup'}
-          </span>
-          <span className={`badge ${sore.isOpen && attendanceSettings.SORE.isActive ? 'badge-success' : 'badge-neutral'}`}>
-            {sore.isOpen && attendanceSettings.SORE.isActive ? 'Absensi Sore Dibuka' : 'Absensi Sore Ditutup'}
+          <span className={`badge ${attendanceStatus.isOpen ? 'badge-success' : 'badge-neutral'}`}>
+            {attendanceStatus.isOpen ? 'Absensi Dibuka' : 'Absensi Ditutup'}
           </span>
         </div>
 
@@ -192,7 +170,7 @@ export default function Absensi() {
           <legend>3. Foto Kegiatan</legend>
           <label>Foto Kegiatan *</label>
           <label className="file-dropzone" htmlFor="abs-photo">
-            <span className="dropzone-icon">🖼️</span>
+            <AppIcon name="camera" className="dropzone-icon" size={30} />
             <div className="dropzone-label">Pilih Foto</div>
             <div className="dropzone-sub">Format JPEG/PNG, maksimal sesuai ketentuan foto</div>
             <input

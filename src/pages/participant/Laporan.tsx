@@ -4,7 +4,8 @@ import { useToast } from '../../components/ui/Toast';
 import { useParticipantSearch } from '../../hooks/useParticipantSearch';
 import { ParticipantSearch } from '../../components/ui/ParticipantSearch';
 import { Spinner } from '../../components/ui/Spinner';
-import { uploadFile, submitReport } from '../../services/participantService';
+import { AppIcon } from '../../components/ui/AppIcon';
+import { uploadAttendancePhoto, submitReport } from '../../services/participantService';
 import { isValidPdf, MAX_REPORT_SIZE } from '../../utils/constants';
 
 export default function Laporan() {
@@ -56,9 +57,14 @@ export default function Laporan() {
     try {
       const ts = Date.now();
       const filename = `${selected.nim}_${ts}.pdf`;
-      const up = await uploadFile('reports', filename, file);
-      if (!up.path) {
-        showToast('Gagal mengunggah file: ' + (up.error ?? 'unknown'), 'error');
+      const upload = await uploadAttendancePhoto({
+        nim: selected.nim,
+        jenis: 'laporan',
+        filename,
+        file,
+      });
+      if (!upload.url) {
+        showToast('Gagal mengunggah file ke Google Drive: ' + upload.error, 'error');
         setSubmitting(false);
         return;
       }
@@ -66,13 +72,10 @@ export default function Laporan() {
       const res = await submitReport({
         participant_id: selected.nim,
         judul: judul.trim(),
-        file: {
-          bucket: 'reports',
-          path: filename,
-          filename: file.name,
-          mimeType: file.type || 'application/pdf',
-          size: file.size,
-        },
+        fileUrl: upload.url,
+        filename: file.name,
+        mimeType: file.type || 'application/pdf',
+        size: file.size,
       });
 
       showToast(res.message, res.success ? 'success' : 'error');
@@ -129,7 +132,7 @@ export default function Laporan() {
 
           <label>File Laporan (PDF, maks 10 MB) *</label>
           <div className="file-dropzone" onClick={() => document.getElementById('laporan-file')?.click()}>
-            <span className="dropzone-icon">📄</span>
+            <AppIcon name="report" className="dropzone-icon" size={30} />
             <div className="dropzone-label">Pilih Dokumen PDF</div>
             <div className="dropzone-sub">Dokumen PDF (maksimal 10 MB) — hanya PDF yang diterima</div>
             <input
@@ -139,7 +142,7 @@ export default function Laporan() {
               style={{ display: 'none' }}
               onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
             />
-            {fileLabel && <div className="file-name-preview">📎 {fileLabel}</div>}
+            {fileLabel && <div className="file-name-preview"><AppIcon name="upload" size={14} /> {fileLabel}</div>}
           </div>
           {fileError && (
             <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: 8 }}>{fileError}</p>
