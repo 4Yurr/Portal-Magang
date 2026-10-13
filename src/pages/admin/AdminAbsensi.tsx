@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
-import { PhotoViewModal } from '../../components/admin/FileActions';
 import { deleteAttendance, fetchAttendance } from '../../services/adminService';
 import type { AttendanceRow } from '../../types';
 import { formatDateTime, formatTime, formatDate } from '../../utils/constants';
@@ -14,7 +13,6 @@ export default function AdminAbsensi() {
   const [tanggal, setTanggal] = useState('');
   const [search, setSearch] = useState('');
   const [kelompok, setKelompok] = useState('');
-  const [photo, setPhoto] = useState<AttendanceRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AttendanceRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -43,7 +41,6 @@ export default function AdminAbsensi() {
         return;
       }
       setData((rows) => rows.filter((row) => row.id !== deleteTarget.id));
-      if (photo?.id === deleteTarget.id) setPhoto(null);
       setDeleteTarget(null);
       showToast('Data absensi berhasil dihapus dan tidak lagi muncul di rekap.', 'success');
     } catch {
@@ -64,6 +61,7 @@ export default function AdminAbsensi() {
         { header: 'Tanggal', key: 'tanggal' },
         { header: 'Jam', key: 'jam' },
         { header: 'Status', key: 'status' },
+        { header: 'Catatan Admin', key: 'admin_note' },
         { header: 'Latitude', key: 'latitude' },
         { header: 'Longitude', key: 'longitude' },
         { header: 'Accuracy', key: 'accuracy' },
@@ -78,6 +76,7 @@ export default function AdminAbsensi() {
         tanggal: d.tanggal,
         jam: d.jam,
         status: d.status,
+        admin_note: d.admin_note ?? '',
         latitude: d.latitude,
         longitude: d.longitude,
         accuracy: d.accuracy,
@@ -131,9 +130,9 @@ export default function AdminAbsensi() {
                   <th>Tanggal</th>
                   <th>Jam</th>
                   <th>Status</th>
+                  <th>Catatan Admin</th>
                   <th>Lat</th>
                   <th>Lon</th>
-                  <th>Foto</th>
                   <th>Created At</th>
                   <th>Aksi</th>
                 </tr>
@@ -148,17 +147,11 @@ export default function AdminAbsensi() {
                     <td>
                       <span className={`badge ${d.status === 'Hadir' ? 'badge-success' : d.status === 'Izin' ? 'badge-warning' : d.status === 'Sakit' ? 'badge-neutral' : 'badge-danger'}`}>{d.status}</span>
                     </td>
+                    <td title={d.created_by ? 'Dicatat manual oleh admin' : undefined}>
+                      {d.admin_note ? <span className="admin-attendance-note">{d.admin_note}</span> : '-'}
+                    </td>
                     <td>{d.latitude ?? '-'}</td>
                     <td>{d.longitude ?? '-'}</td>
-                    <td>
-                      {d.photo_path ? (
-                        <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setPhoto(d)}>
-                          Lihat
-                        </button>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
                     <td>{formatDateTime(d.created_at)}</td>
                     <td>
                       <button className="btn btn-danger" onClick={() => setDeleteTarget(d)}>
@@ -179,10 +172,6 @@ export default function AdminAbsensi() {
           )}
         </div>
       </div>
-
-      {photo && (
-        <PhotoViewModal storagePath={photo.photo_path} filename={photo.photo_filename} onClose={() => setPhoto(null)} />
-      )}
 
       {deleteTarget && (
         <div className="modal-overlay" onClick={() => !deleting && setDeleteTarget(null)}>

@@ -33,23 +33,30 @@ export function LocationPicker({ onLocationChange }: Props) {
         disabled={locating}
       >
         <AppIcon name="pin" size={16} />
-        {locating ? 'Mengambil lokasi...' : location ? 'Lokasi Diambil (Hapus)' : 'Ambil Lokasi Saya'}
+        {locating ? 'Mengambil lokasi...' : location ? 'Hapus Lokasi' : 'Ambil Lokasi Saya'}
       </button>
 
       {location && (
-        <div style={{ marginTop: 10 }}>
+        <div className="location-result">
           <p className="location-status success">
             <AppIcon name="check" size={14} /> Lat: {location.latitude.toFixed(5)} | Lon: {location.longitude.toFixed(5)} | Akurasi ±
             {Math.round(location.accuracy)} m
           </p>
+          <iframe
+            className="location-map"
+            title="Peta lokasi absensi"
+            src={`https://maps.google.com/maps?q=${location.latitude},${location.longitude}&z=16&output=embed`}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            allowFullScreen
+          />
           <a
-            className="btn btn-accent"
-            style={{ fontSize: '0.85rem', padding: '8px 14px', marginTop: 6 }}
+            className="location-map-link"
             href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
             target="_blank"
             rel="noopener noreferrer"
           >
-            <AppIcon name="arrowUpRight" size={14} /> Buka Google Maps
+            <AppIcon name="arrowUpRight" size={14} /> Buka di Google Maps
           </a>
         </div>
       )}

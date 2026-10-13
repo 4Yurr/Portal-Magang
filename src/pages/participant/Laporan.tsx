@@ -5,7 +5,7 @@ import { useParticipantSearch } from '../../hooks/useParticipantSearch';
 import { ParticipantSearch } from '../../components/ui/ParticipantSearch';
 import { Spinner } from '../../components/ui/Spinner';
 import { AppIcon } from '../../components/ui/AppIcon';
-import { uploadAttendancePhoto, submitReport } from '../../services/participantService';
+import { uploadParticipantFileToDrive, submitReport } from '../../services/participantService';
 import { isValidPdf, MAX_REPORT_SIZE } from '../../utils/constants';
 
 export default function Laporan() {
@@ -18,7 +18,7 @@ export default function Laporan() {
   const [fileLabel, setFileLabel] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [resetKey, setResetKey] = useState<object | null>(null);
+  const [resetKey, setResetKey] = useState(0);
 
   const handleFile = (f: File | null) => {
     setFileError(null);
@@ -57,7 +57,7 @@ export default function Laporan() {
     try {
       const ts = Date.now();
       const filename = `${selected.nim}_${ts}.pdf`;
-      const upload = await uploadAttendancePhoto({
+      const upload = await uploadParticipantFileToDrive({
         nim: selected.nim,
         jenis: 'laporan',
         filename,
@@ -83,7 +83,7 @@ export default function Laporan() {
         clear();
         setJudul('');
         handleFile(null);
-        setResetKey({});
+        setResetKey((key) => key + 1);
       }
     } catch (e) {
       console.error('Laporan submit error:', e);
@@ -107,8 +107,9 @@ export default function Laporan() {
           <legend>1. Identitas Peserta</legend>
           <label>Cari Peserta (NIM) *</label>
           <ParticipantSearch
-            key={resetKey ? String(resetKey) : 'initial'}
+            clearKey={resetKey}
             onSelect={select}
+            onClear={clear}
             placeholder="Ketik NIM peserta (contoh: 23...)"
           />
           <label>Nama Lengkap</label>

@@ -7,11 +7,12 @@ import { Spinner } from './Spinner';
 
 type Props = {
   onSelect: (p: { nim: string; nama: string; fakultas: string; prodi: string; kelompok: string }) => void;
+  onClear?: () => void;
   placeholder?: string;
   clearKey?: unknown;
 };
 
-export function ParticipantSearch({ onSelect, placeholder, clearKey }: Props) {
+export function ParticipantSearch({ onSelect, onClear, placeholder, clearKey }: Props) {
   const { query, setQuery, results, selected, select, clear, loading } = useParticipantSearch();
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -31,6 +32,7 @@ export function ParticipantSearch({ onSelect, placeholder, clearKey }: Props) {
 
   const handleClear = () => {
     clear();
+    onClear?.();
     setOpen(true);
     inputRef.current?.focus();
   };

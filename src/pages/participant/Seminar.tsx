@@ -7,8 +7,8 @@ import { ParticipantSearch } from '../../components/ui/ParticipantSearch';
 import { Spinner } from '../../components/ui/Spinner';
 import { AppIcon } from '../../components/ui/AppIcon';
 import type { GeoLocation } from '../../types';
-import { getServerWib, submitSeminar, uploadAttendancePhoto } from '../../services/participantService';
-import { wibDateString, wibTimeString, isValidPhoto } from '../../utils/constants';
+import { getServerWib, submitSeminar } from '../../services/participantService';
+import { wibDateString, wibTimeString } from '../../utils/constants';
 
 export default function Seminar() {
   const navigate = useNavigate();
@@ -18,10 +18,8 @@ export default function Seminar() {
   const [serverWibDate, setServerWibDate] = useState<Date | null>(null);
   const [kegiatan, setKegiatan] = useState('');
   const [location, setLocation] = useState<GeoLocation | null>(null);
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [resetKey, setResetKey] = useState<object | null>(null);
+  const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
     const refresh = async () => {
@@ -35,36 +33,13 @@ export default function Seminar() {
 
   const now = serverWibDate ?? new Date();
 
-  const handlePhoto = (file: File | null) => {
-    setPhoto(file);
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setPhotoPreview(file ? URL.createObjectURL(file) : null);
-  };
-
   const handleSubmit = async () => {
     if (!selected) return showToast('Pilih peserta (NIM) terlebih dahulu', 'error');
     if (!kegiatan.trim()) return showToast('Nama seminar/kegiatan wajib diisi', 'error');
     if (!location) return showToast('Silakan klik Ambil Lokasi terlebih dahulu', 'error');
-    if (!photo) return showToast('Foto selfie wajib diambil', 'error');
 
     setSubmitting(true);
     try {
-      const fileExtension = photo.name.includes('.') ? photo.name.split('.').pop()?.toLowerCase() : 'jpg';
-      const userId = selected.nim.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-      const newFileName = `${userId}_seminar_${new Date().toISOString().split('T')[0]}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension || 'jpg'}`;
-      const photoUp = await uploadAttendancePhoto({
-        nim: selected.nim,
-        tanggal: wibDateString(now),
-        kegiatan: kegiatan.trim(),
-        jenis: 'seminar',
-        filename: newFileName,
-        file: photo,
-      });
-      if (!photoUp.url) {
-        showToast(`Foto seminar gagal diunggah. Absensi belum disimpan: ${photoUp.error ?? 'unknown'}`, 'error');
-        return;
-      }
-
       const res = await submitSeminar({
         participant_id: selected.nim,
         kegiatan: kegiatan.trim(),
@@ -73,8 +48,6 @@ export default function Seminar() {
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
-        photoUrl: photoUp.url,
-        photoFilename: newFileName,
       });
 
       showToast(res.message, res.success ? 'success' : 'error');
@@ -83,8 +56,7 @@ export default function Seminar() {
         clear();
         setKegiatan('');
         setLocation(null);
-        handlePhoto(null);
-        setResetKey({});
+        setResetKey((key) => key + 1);
       }
     } catch (e) {
       console.error('Seminar submit error:', e);
@@ -96,7 +68,13 @@ export default function Seminar() {
 
   return (
     <div className="page">
-      <div className="form-section">
+      <form
+        className="form-section attendance-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleSubmit();
+        }}
+      >
         <div className="page-header">
           <h2>ABSENSI SEMINAR</h2>
           <button className="btn-back" onClick={() => navigate('/')} type="button">
@@ -104,37 +82,44 @@ export default function Seminar() {
           </button>
         </div>
 
+        <p className="attendance-description">
+          Catat kehadiran seminar dengan memilih peserta, mengisi nama kegiatan, dan mengonfirmasi lokasi.
+        </p>
+
         <div className="info-banner">
           <AppIcon name="seminar" size={18} />
           <div>
             <strong>Kehadiran Seminar / Webinar Magang</strong>
-            <br />
-            <em>Waktu server: {wibDateString(now)} {wibTimeString(now)} WIB</em>
+            <small className="attendance-server-time">Waktu server: {wibDateString(now)} {wibTimeString(now)} WIB</small>
           </div>
         </div>
 
         <fieldset>
           <legend>1. Identitas Peserta</legend>
-          <label>Cari Peserta (NIM) *</label>
+          <p className="attendance-step-help">Cari dan pilih nama peserta berdasarkan NIM.</p>
+          <label>Cari Peserta (NIM) <span aria-hidden="true">*</span></label>
           <ParticipantSearch
-            key={resetKey ? String(resetKey) : 'initial'}
+            clearKey={resetKey}
             onSelect={select}
+            onClear={clear}
             placeholder="Ketik NIM peserta (contoh: 23...)"
           />
-          <label>Nama Lengkap</label>
-          <input
-            type="text"
-            readOnly
-            value={selected?.nama ?? ''}
-            placeholder="Nama otomatis muncul setelah memilih NIM"
-          />
+          {selected && (
+            <div className="attendance-selected-participant">
+              <span>Peserta terpilih</span>
+              <strong>{selected.nama}</strong>
+              <small>NIM {selected.nim}</small>
+            </div>
+          )}
         </fieldset>
 
         <fieldset>
           <legend>2. Detail Seminar</legend>
-          <label>Nama Seminar / Kegiatan *</label>
+          <p className="attendance-step-help">Tuliskan nama seminar atau webinar yang sedang diikuti.</p>
+          <label>Nama Seminar / Kegiatan <span aria-hidden="true">*</span></label>
           <input
             type="text"
+            required
             value={kegiatan}
             onChange={(e) => setKegiatan(e.target.value)}
             placeholder="Contoh: Seminar Kepemimpinan BPJS"
@@ -142,42 +127,26 @@ export default function Seminar() {
         </fieldset>
 
         <fieldset>
-          <legend>3. Lokasi Kegiatan</legend>
+          <legend>3. Konfirmasi Lokasi</legend>
+          <p className="attendance-step-help">Ambil lokasi GPS agar koordinat ikut tercatat bersama absensi.</p>
           <LocationPicker onLocationChange={setLocation} />
         </fieldset>
 
-        <fieldset>
-          <legend>4. Foto Kegiatan</legend>
-          <label>Foto Selfie di Lokasi Seminar *</label>
-          <label className="file-dropzone" htmlFor="seminar-photo">
-            <AppIcon name="camera" className="dropzone-icon" size={30} />
-            <div className="dropzone-label">Ambil Foto / Pilih Gambar</div>
-            <div className="dropzone-sub">Foto selfie jelas di lokasi seminar</div>
-            <input
-              id="seminar-photo"
-              type="file"
-              accept="image/*"
-              className="file-input-visually-hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                if (f && !isValidPhoto(f)) {
-                  showToast('Format foto tidak valid', 'error');
-                  e.target.value = '';
-                  return;
-                }
-                handlePhoto(f);
-              }}
-            />
-            {photoPreview && (
-              <div className="file-name-preview">
-                <img src={photoPreview} alt="Preview" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 8 }} />
-                <div style={{ marginTop: 6 }}>{photo?.name}</div>
-              </div>
-            )}
-          </label>
-        </fieldset>
-
-        <button className="btn btn-primary btn-submit" onClick={handleSubmit} disabled={submitting}>
+        <div className="attendance-submit-area">
+          <p className="attendance-submit-hint">
+            {!selected
+              ? 'Pilih peserta untuk melanjutkan.'
+              : !kegiatan.trim()
+                ? 'Isi nama seminar atau kegiatan untuk melanjutkan.'
+                : !location
+                  ? 'Ambil lokasi GPS untuk melanjutkan.'
+                  : 'Data siap dikirim dan dicatat.'}
+          </p>
+          <button
+            className="btn btn-primary btn-submit"
+            type="submit"
+            disabled={submitting || !selected || !kegiatan.trim() || !location}
+          >
           {submitting ? (
             <>
               <Spinner size={16} /> Menyimpan...
@@ -185,8 +154,9 @@ export default function Seminar() {
           ) : (
             'KIRIM ABSENSI SEMINAR'
           )}
-        </button>
-      </div>
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

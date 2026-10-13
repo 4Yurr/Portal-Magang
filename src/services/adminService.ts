@@ -146,6 +146,26 @@ export async function hardDeleteParticipant(nim: string) {
 // ============================================================================
 // ADMIN DATA TABLES
 // ============================================================================
+export async function createManualAttendance(payload: {
+  participant_id: string;
+  tanggal: string;
+  jam: string;
+  status: AttendanceRow['status'];
+  admin_note: string;
+}) {
+  return supabase
+    .from('attendance')
+    .insert({
+      participant_id: payload.participant_id,
+      tanggal: payload.tanggal,
+      jam: payload.jam,
+      status: payload.status,
+      admin_note: payload.admin_note.trim(),
+    })
+    .select()
+    .single();
+}
+
 export async function fetchAttendance(opts?: {
   date?: string;
   startDate?: string;

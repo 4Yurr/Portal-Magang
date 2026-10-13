@@ -407,6 +407,75 @@ input[readonly] {
   margin-top: 8px;
 }
 
+.attendance-form {
+  max-width: 680px;
+}
+
+.attendance-description {
+  margin: -8px 0 18px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.attendance-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.attendance-overview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attendance-overview small,
+.attendance-server-time {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.attendance-step-help {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.attendance-selected-participant {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid #c8ead8;
+  border-radius: var(--radius-sm);
+  background: var(--success-soft);
+}
+
+.attendance-selected-participant span,
+.attendance-selected-participant small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.attendance-selected-participant strong {
+  color: #176b45;
+}
+
+.attendance-submit-area {
+  margin-top: 4px;
+}
+
+.attendance-submit-hint {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
 /* ---- Info banner ---- */
 .info-banner {
   display: flex;
@@ -419,6 +488,34 @@ input[readonly] {
   margin-bottom: 16px;
   font-size: 0.85rem;
   color: var(--bpjs-blue-dark);
+}
+.location-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #c8ead8;
+  border-radius: var(--radius-sm);
+  background: #f8fcfa;
+}
+.location-result .location-status {
+  margin: 0;
+}
+.location-map {
+  display: block;
+  width: 100%;
+  height: 240px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.location-map-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 /* ---- Download banner ---- */
@@ -944,13 +1041,70 @@ input[readonly] {
 .attendance-empty {
   color: #9aa7ba;
 }
+.attendance-add-button {
+  width: 30px;
+  height: 28px;
+  border: 1px dashed #cbd8e8;
+  border-radius: 6px;
+  background: #fff;
+  color: #8192a8;
+  font-size: 1rem;
+  line-height: 1;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.attendance-add-button:hover,
+.attendance-add-button:focus-visible {
+  border-color: var(--bpjs-blue-light);
+  background: var(--bpjs-sky);
+  color: var(--bpjs-blue);
+  outline: none;
+}
 .attendance-recap-empty {
   padding: 28px !important;
   text-align: center !important;
   color: var(--text-muted);
 }
+.manual-attendance-modal {
+  max-width: 560px;
+}
+.manual-attendance-modal .helper-text {
+  margin-bottom: 16px;
+}
+.manual-attendance-modal label {
+  margin-top: 12px;
+}
+.manual-attendance-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.manual-attendance-fields input {
+  width: 100%;
+}
+.manual-attendance-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+.admin-attendance-note {
+  display: block;
+  max-width: 250px;
+  white-space: normal;
+  font-size: 0.82rem;
+}
 
 @media (max-width: 640px) {
+  .manual-attendance-fields {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .manual-attendance-actions {
+    flex-direction: column-reverse;
+  }
+  .manual-attendance-actions .btn {
+    width: 100%;
+  }
   .attendance-recap-count {
     margin-left: 0;
   }

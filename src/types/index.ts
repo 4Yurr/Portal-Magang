@@ -34,6 +34,8 @@ export type AttendanceRow = {
   accuracy: number | null;
   photo_path: string | null;
   photo_filename: string | null;
+  admin_note: string | null;
+  created_by: string | null;
   created_at: string;
 };
 

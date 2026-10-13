@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
-import { PhotoViewModal } from '../../components/admin/FileActions';
 import { deleteSeminar, fetchSeminar, updateSeminar } from '../../services/adminService';
 import type { AttendanceStatus, SeminarRow } from '../../types';
 import { formatDateTime, formatTime, formatDate } from '../../utils/constants';
@@ -13,7 +12,6 @@ export default function AdminSeminar() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tanggal, setTanggal] = useState('');
-  const [photo, setPhoto] = useState<SeminarRow | null>(null);
   const [editingRow, setEditingRow] = useState<SeminarRow | null>(null);
   const [statusDraft, setStatusDraft] = useState<AttendanceStatus>('Hadir');
   const [kegiatanDraft, setKegiatanDraft] = useState('');
@@ -129,7 +127,6 @@ export default function AdminSeminar() {
                   <th>Tanggal</th>
                   <th>Jam</th>
                   <th>Status</th>
-                  <th>Foto</th>
                   <th>Created At</th>
                   <th>Aksi</th>
                 </tr>
@@ -144,15 +141,6 @@ export default function AdminSeminar() {
                     <td>{formatTime(d.jam)}</td>
                     <td>
                       <span className={`badge ${d.status === 'Hadir' ? 'badge-success' : d.status === 'Izin' ? 'badge-warning' : d.status === 'Sakit' ? 'badge-neutral' : 'badge-danger'}`}>{d.status}</span>
-                    </td>
-                    <td>
-                      {d.photo_path ? (
-                        <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setPhoto(d)}>
-                          Lihat
-                        </button>
-                      ) : (
-                        '-'
-                      )}
                     </td>
                     <td>{formatDateTime(d.created_at)}</td>
                     <td>
@@ -175,7 +163,7 @@ export default function AdminSeminar() {
                 ))}
                 {data.length === 0 && (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: 30 }}>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: 30 }}>
                       Tidak ada data absensi seminar.
                     </td>
                   </tr>
@@ -231,9 +219,6 @@ export default function AdminSeminar() {
         </div>
       )}
 
-      {photo && (
-        <PhotoViewModal storagePath={photo.photo_path} filename={photo.photo_filename} onClose={() => setPhoto(null)} />
-      )}
     </div>
   );
 }

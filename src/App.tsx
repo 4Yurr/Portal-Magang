@@ -24,7 +24,7 @@ import ExportData from './pages/admin/ExportData';
 import Pengaturan from './pages/admin/Pengaturan';
 import AdminPengumuman from './pages/admin/AdminPengumuman';
 
-const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE !== 'false';
+const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
 
 function MaintenancePage() {
   return (

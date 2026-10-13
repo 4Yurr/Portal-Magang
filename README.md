@@ -50,7 +50,7 @@ src/
     admin/        Login, Dashboard, Peserta, AdminAbsensi, AdminRekapAbsensi,
                   AdminSeminar, AdminPengumuman, AdminViralisasi, AdminLaporan, AdminMateri, ExportData
 supabase/
-  migrations/     0001-0013 (schema, RLS, daily attendance, announcements)
+  migrations/     0001-0014 (schema, RLS, daily attendance, admin manual attendance, announcements)
   seed/           participants.sql (15 contoh), admin_how_to.sql
 public/materials/ BPU.pdf, PU.pdf, dan brosur BPJS 2026 (file materi yang disajikan peserta)
 ```
@@ -63,7 +63,7 @@ public/materials/ BPU.pdf, PU.pdf, dan brosur BPJS 2026 (file materi yang disaji
 2. Buka **SQL Editor**, jalankan file migrasi **secara urut**:
    - `supabase/migrations/0001_initial_schema.sql`
    - `supabase/migrations/0002_materials_and_functions.sql`
-   - Jalankan migration lanjutan `0003` sampai `0013` secara berurutan.
+   - Jalankan migration lanjutan `0003` sampai `0014` secara berurutan.
    (Ini membuat tabel, fungsi `is_admin()`, **RLS**, bucket storage, view, dan seed materi.)
 3. **(Opsional) Seed peserta contoh**: jalankan `supabase/seed/participants.sql`
    untuk 15 peserta, atau isi sendiri tabel `public.participants`.
@@ -130,8 +130,10 @@ npm run lint
 
 - Satu jam buka dan jam tutup diatur admin melalui menu Pengaturan.
 - Di luar jendela → absensi ditolak oleh trigger database berdasarkan waktu server WIB.
-- Foto dikirim melalui Supabase Edge Function ke Google Drive; database menyimpan URL Drive.
+- Kehadiran biasa hanya mencatat peserta, waktu, status, dan koordinat GPS; foto tidak diperlukan.
 - **Duplikat diblokir** oleh unique constraint `(participant_id, tanggal)`.
+- Jika peserta lupa absen, admin dapat menambahkan entri dari Rekap Absensi Biasa. Entri manual mewajibkan alasan,
+  menyimpan admin pencatat, dan otomatis masuk ke audit log. Tanggal/jam manual hanya dapat ditetapkan admin.
 - GPS: catat lat/lng/accuracy dari Geolocation API (tanpa tolak radius). Tangani
   `PERMISSION_DENIED` / `POSITION_UNAVAILABLE` / `TIMEOUT` dengan pesan ramah.
 
@@ -154,6 +156,7 @@ peserta hanya melihat pengumuman terbit dan mengunduh lampiran.
 - [ ] GPS: izinkan → catat lokasi; tolak → pesan error ramah (tetap bisa lanjut).
 - [ ] Buat admin via `admin_roles`, login di `/login` → bisa akses semua menu.
 - [ ] Rekap absensi admin menampilkan bulan terpilih dan status bisa diperbarui.
+- [ ] Admin dapat menambahkan absensi manual dengan alasan; duplikat pada tanggal yang sama ditolak dan tindakan tercatat di audit log.
 - [ ] Pengumuman dapat diterbitkan dengan gambar/lampiran, dan peserta dapat mengunduh lampiran.
 - [ ] Export Excel dari admin (peserta, absensi, seminar, viralisasi, laporan) → file `.xlsx` terunduh.
 - [ ] Upload materi BPU.pdf/PU.pdf ke bucket `materials` → peserta bisa buka/download.

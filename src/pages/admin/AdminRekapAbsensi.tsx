@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useToast } from '../../components/ui/Toast';
 import { Spinner } from '../../components/ui/Spinner';
-import { fetchAttendance, fetchParticipants, updateAttendanceStatus } from '../../services/adminService';
+import { fetchAttendance, fetchParticipants, updateAttendanceStatus, createManualAttendance } from '../../services/adminService';
 import type { AttendanceRow, AttendanceStatus, Participant } from '../../types';
 import { exportToExcel } from '../../utils/excel';
 import { wibDateString } from '../../utils/constants';
@@ -29,6 +29,14 @@ export default function AdminRekapAbsensi() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<string | null>(null);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [manualParticipantId, setManualParticipantId] = useState('');
+  const [manualParticipantSearch, setManualParticipantSearch] = useState('');
+  const [manualDate, setManualDate] = useState('');
+  const [manualTime, setManualTime] = useState('08:00');
+  const [manualStatus, setManualStatus] = useState<AttendanceStatus>('Hadir');
+  const [manualReason, setManualReason] = useState('');
+  const [savingManual, setSavingManual] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +69,7 @@ export default function AdminRekapAbsensi() {
   const attendanceByParticipantDate = useMemo(() => new Map(
     attendance.map((row) => [`${row.nim ?? ''}|${row.tanggal}`, row]),
   ), [attendance]);
+  const today = wibDateString();
 
   const filteredParticipants = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -85,6 +94,72 @@ export default function AdminRekapAbsensi() {
     } finally {
       setSavingId(null);
       setEditingCell(null);
+    }
+  };
+
+  const openManualAttendance = (participantId = '', date?: string) => {
+    setManualParticipantId(participantId);
+    setManualParticipantSearch('');
+    setManualDate(date ?? (month >= currentMonth() ? today : `${month}-01`));
+    setManualTime('08:00');
+    setManualStatus('Hadir');
+    setManualReason('');
+    setManualModalOpen(true);
+  };
+
+  const saveManualAttendance = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!manualParticipantId) {
+      showToast('Pilih peserta yang akan dicatat kehadirannya.', 'error');
+      return;
+    }
+    if (!manualDate || manualDate > wibDateString()) {
+      showToast('Tanggal kehadiran harus hari ini atau tanggal yang sudah lewat.', 'error');
+      return;
+    }
+    if (!manualTime || !manualReason.trim()) {
+      showToast('Jam dan alasan pencatatan wajib diisi.', 'error');
+      return;
+    }
+
+    setSavingManual(true);
+    try {
+      const { error } = await createManualAttendance({
+        participant_id: manualParticipantId,
+        tanggal: manualDate,
+        jam: `${manualTime}:00`,
+        status: manualStatus,
+        admin_note: manualReason.trim(),
+      });
+      if (error) {
+        if (error.code === '23505') {
+          showToast('Kehadiran peserta pada tanggal tersebut sudah tercatat.', 'error');
+        } else if (error.message.includes('ADMIN_ATTENDANCE_REASON_REQUIRED')) {
+          showToast('Alasan pencatatan wajib diisi.', 'error');
+        } else {
+          console.error('createManualAttendance error:', error);
+          showToast('Gagal menambahkan kehadiran. Silakan coba lagi.', 'error');
+        }
+        return;
+      }
+
+      showToast('Kehadiran manual berhasil dicatat dan masuk ke audit admin.', 'success');
+      setManualModalOpen(false);
+      const createdMonth = manualDate.slice(0, 7);
+      if (createdMonth !== month) setMonth(createdMonth);
+      else {
+        try {
+          setAttendance(await fetchAttendance(monthBounds(month)));
+        } catch (refreshError) {
+          console.error('Manual attendance saved but recap refresh failed:', refreshError);
+          showToast('Kehadiran tersimpan, tetapi rekap belum diperbarui. Muat ulang halaman.', 'error');
+        }
+      }
+    } catch (error) {
+      console.error('createManualAttendance error:', error);
+      showToast('Gagal menambahkan kehadiran. Silakan coba lagi.', 'error');
+    } finally {
+      setSavingManual(false);
     }
   };
 
@@ -138,6 +213,9 @@ export default function AdminRekapAbsensi() {
           </div>
           <button className="btn btn-accent" onClick={exportMonth} disabled={loading || filteredParticipants.length === 0}>
             Download Excel
+          </button>
+          <button className="btn btn-primary" type="button" onClick={() => openManualAttendance()}>
+            + Tambah Kehadiran
           </button>
           <span className="attendance-recap-count">{filteredParticipants.length} peserta</span>
         </div>
@@ -198,7 +276,19 @@ export default function AdminRekapAbsensi() {
                               )}
                             </div>
                           ) : (
-                            <span className="attendance-empty">-</span>
+                            date <= today ? (
+                              <button
+                                className="attendance-add-button"
+                                type="button"
+                                title={`Tambahkan kehadiran ${participant.nama} tanggal ${date}`}
+                                aria-label={`Tambahkan kehadiran ${participant.nama} tanggal ${date}`}
+                                onClick={() => openManualAttendance(participant.nim, date)}
+                              >
+                                +
+                              </button>
+                            ) : (
+                              <span className="attendance-empty">-</span>
+                            )
                           )}
                         </td>
                       );
@@ -213,6 +303,102 @@ export default function AdminRekapAbsensi() {
           )}
         </div>
       </div>
+
+      {manualModalOpen && (
+        <div className="modal-overlay" onClick={() => !savingManual && setManualModalOpen(false)}>
+          <form className="modal manual-attendance-modal" onSubmit={saveManualAttendance} onClick={(event) => event.stopPropagation()}>
+            <h3>Tambah Kehadiran Manual</h3>
+            <p className="helper-text">
+              Gunakan untuk mencatat peserta yang lupa absen. Entri ini akan ditandai sebagai pencatatan admin dan masuk ke audit.
+            </p>
+
+            <label htmlFor="manual-attendance-search">Cari peserta</label>
+            <input
+              id="manual-attendance-search"
+              type="text"
+              value={manualParticipantSearch}
+              onChange={(event) => setManualParticipantSearch(event.target.value)}
+              placeholder="Cari berdasarkan NIM atau nama"
+              autoComplete="off"
+            />
+            <label htmlFor="manual-attendance-participant">Peserta *</label>
+            <select
+              id="manual-attendance-participant"
+              required
+              value={manualParticipantId}
+              onChange={(event) => setManualParticipantId(event.target.value)}
+            >
+              <option value="">Pilih peserta</option>
+              {participants
+                .filter((participant) => {
+                  const query = manualParticipantSearch.trim().toLowerCase();
+                  return !query || participant.nim.toLowerCase().includes(query) || participant.nama.toLowerCase().includes(query);
+                })
+                .map((participant) => (
+                  <option key={participant.nim} value={participant.nim}>
+                    {participant.nim} — {participant.nama}
+                  </option>
+                ))}
+            </select>
+
+            <div className="manual-attendance-fields">
+              <div>
+                <label htmlFor="manual-attendance-date">Tanggal *</label>
+                <input
+                  id="manual-attendance-date"
+                  type="date"
+                  required
+                  max={wibDateString()}
+                  value={manualDate}
+                  onChange={(event) => setManualDate(event.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="manual-attendance-time">Jam kehadiran *</label>
+                <input
+                  id="manual-attendance-time"
+                  type="time"
+                  required
+                  value={manualTime}
+                  onChange={(event) => setManualTime(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <label htmlFor="manual-attendance-status">Status *</label>
+            <select
+              id="manual-attendance-status"
+              value={manualStatus}
+              onChange={(event) => setManualStatus(event.target.value as AttendanceStatus)}
+            >
+              <option value="Hadir">Hadir</option>
+              <option value="Izin">Izin</option>
+              <option value="Sakit">Sakit</option>
+              <option value="Ditolak">Ditolak</option>
+            </select>
+
+            <label htmlFor="manual-attendance-reason">Alasan pencatatan *</label>
+            <textarea
+              id="manual-attendance-reason"
+              required
+              rows={3}
+              minLength={5}
+              value={manualReason}
+              onChange={(event) => setManualReason(event.target.value)}
+              placeholder="Contoh: Peserta hadir, tetapi lupa melakukan absensi di portal."
+            />
+
+            <div className="manual-attendance-actions">
+              <button className="btn btn-primary" type="submit" disabled={savingManual}>
+                {savingManual ? <><Spinner size={14} /> Menyimpan...</> : 'Simpan Kehadiran'}
+              </button>
+              <button className="btn btn-outline" type="button" onClick={() => setManualModalOpen(false)} disabled={savingManual}>
+                Batal
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
     </div>
   );

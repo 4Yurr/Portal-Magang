@@ -47,6 +47,8 @@ export interface Database {
           accuracy: number | null;
           photo_path: string | null;
           photo_filename: string | null;
+          admin_note: string | null;
+          created_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -60,6 +62,8 @@ export interface Database {
           accuracy?: number | null;
           photo_path?: string | null;
           photo_filename?: string | null;
+          admin_note?: string | null;
+          created_by?: string | null;
         };
         Update: {
           tanggal?: string;
@@ -67,6 +71,8 @@ export interface Database {
           status?: 'Hadir' | 'Izin' | 'Sakit' | 'Ditolak';
           photo_path?: string | null;
           photo_filename?: string | null;
+          admin_note?: string | null;
+          created_by?: string | null;
         };
         Relationships: [];
       };

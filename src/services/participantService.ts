@@ -38,13 +38,11 @@ export async function getParticipant(nim: string) {
 // ---- Server time (WIB) ----
 // ---- Rest of file ---
 // ============================================================================
-// UPLOAD FOTO ABSENSI KE GOOGLE DRIVE (via Supabase Edge Function)
+// UPLOAD LAPORAN KE GOOGLE DRIVE (via Supabase Edge Function)
 // ============================================================================
-export async function uploadAttendancePhoto(opts: {
+export async function uploadParticipantFileToDrive(opts: {
   nim: string;
-  tanggal?: string;
-  kegiatan?: string;
-  jenis: 'biasa' | 'seminar' | 'laporan';
+  jenis: 'laporan';
   filename: string;
   file: File;
 }): Promise<{ ok: boolean; url: string | null; error: string }> {
@@ -56,15 +54,13 @@ export async function uploadAttendancePhoto(opts: {
       jenis: opts.jenis,
       filename: opts.filename,
     });
-    if (opts.tanggal) qs.set('tanggal', opts.tanggal);
-    if (opts.kegiatan) qs.set('kegiatan', opts.kegiatan);
     if (opts.file.type) qs.set('type', opts.file.type);
     const res = await fetch(
       `${supabaseUrl}/functions/v1/upload-attendance?${qs.toString()}`,
       {
         method: 'POST',
         headers: {
-          'Content-Type': opts.file.type || 'image/jpeg',
+          'Content-Type': opts.file.type || 'application/pdf',
           Authorization: `Bearer ${anonKey}`,
         },
         body: opts.file,
@@ -172,8 +168,6 @@ export async function submitAttendance(payload: {
   latitude: number;
   longitude: number;
   accuracy: number;
-  photoUrl: string | null;
-  photoFilename: string | null;
 }): Promise<{ success: boolean; message: string }> {
   const { error } = await supabase.from('attendance').insert({
     participant_id: payload.participant_id,
@@ -182,8 +176,6 @@ export async function submitAttendance(payload: {
     latitude: payload.latitude,
     longitude: payload.longitude,
     accuracy: payload.accuracy,
-    photo_path: payload.photoUrl,
-    photo_filename: payload.photoFilename,
     status: 'Hadir',
   });
   if (error) {
@@ -220,8 +212,6 @@ export async function submitSeminar(payload: {
   latitude: number;
   longitude: number;
   accuracy: number;
-  photoUrl: string | null;
-  photoFilename: string | null;
 }): Promise<{ success: boolean; message: string }> {
   const { error } = await supabase.from('seminar_attendance').insert({
     participant_id: payload.participant_id,
@@ -231,8 +221,6 @@ export async function submitSeminar(payload: {
     latitude: payload.latitude,
     longitude: payload.longitude,
     accuracy: payload.accuracy,
-    photo_path: payload.photoUrl,
-    photo_filename: payload.photoFilename,
     status: 'Hadir',
   });
   if (error) {
