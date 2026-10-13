@@ -24,6 +24,27 @@ import ExportData from './pages/admin/ExportData';
 import Pengaturan from './pages/admin/Pengaturan';
 import AdminPengumuman from './pages/admin/AdminPengumuman';
 
+const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE !== 'false';
+
+function MaintenancePage() {
+  return (
+    <div className="maintenance-screen">
+      <div className="maintenance-card">
+        <div className="maintenance-badge">Portal Maintenance</div>
+        <h1>Portal sedang dalam pemeliharaan</h1>
+        <p>
+          Mohon maaf, portal magang BPJS Ketenagakerjaan saat ini sedang dalam proses
+          pemeliharaan. Silakan coba kembali beberapa saat lagi.
+        </p>
+        <div className="maintenance-meta">
+          <span>Status</span>
+          <strong>Sedang diperbaiki</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { isAuthenticated, loading } = useAuth();
   if (loading) {
@@ -73,6 +94,15 @@ function RouteTitle() {
 }
 
 export default function App() {
+  if (isMaintenanceMode) {
+    return (
+      <BrowserRouter>
+        <RouteTitle />
+        <MaintenancePage />
+      </BrowserRouter>
+    );
+  }
+
   return (
     <BrowserRouter>
       <RouteTitle />
